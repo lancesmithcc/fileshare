@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>{{ site_settings.hero_title }}</h1>
+  <p>{{ site_settings.hero_subtitle }}</p>
+  <p class="hero-description">{{ site_settings.landing_description }}</p>
+  <div class="cta">
+    <a class="button" href="{{ url_for('auth.register') }}">Join the Circle</a>
+    <a class="ghost-button" href="{{ url_for('auth.login') }}">Sign In</a>
+  </div>
+</section>
+<section class="features">
+  <article>
+    <span class="glyph icon-trigram-heaven" aria-hidden="true"></span>
+    <h2>Gathering Stream</h2>
+    <p>Share rites, reflections, and seasonal stories with fellow druids.</p>
+  </article>
+  <article>
+    <span class="glyph icon-trigram-water" aria-hidden="true"></span>
+    <h2>Living Circles</h2>
+    <p>Form circles for groves, study groups, and community service.</p>
+  </article>
+  <article>
+    <span class="glyph icon-trigram-earth" aria-hidden="true"></span>
+    <h2>AI Archdruid</h2>
+    <p>Consult a local model for ritual inspiration and inclusive guidance.</p>
+  </article>
+</section>
+{% endblock %}

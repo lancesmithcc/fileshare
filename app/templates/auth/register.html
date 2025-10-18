@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Join the Circle</h1>
+<form method="post" class="card form">
+  <label>
+    Chosen Name
+    <input type="text" name="username" required autofocus>
+  </label>
+  <label>
+    Missive Email
+    <input type="email" name="email" required>
+  </label>
+  <label>
+    Secret Phrase
+    <input type="password" name="password" required>
+  </label>
+  <label>
+    Grove (Optional)
+    <input type="text" name="grove" placeholder="e.g. Silver Birch Grove">
+  </label>
+  <label>
+    Choose or Found a Circle
+    <input list="circle-list" name="circle" placeholder="Forest Keepers">
+    <datalist id="circle-list">
+      {% for circle in circles %}
+      <option value="{{ circle.name }}">
+      {% endfor %}
+    </datalist>
+  </label>
+  <button type="submit" class="button">Join</button>
+</form>
+<p class="form-help">Newly registered members remain pending until an arch druid approves them.</p>
+<p>Already a member? <a href="{{ url_for('auth.login') }}">Sign in.</a></p>
+{% endblock %}

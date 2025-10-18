@@ -1,0 +1,32 @@
+## Virtual env
+.venv/
+
+## Logs and runtime
+logs/
+*.log
+
+## Python
+__pycache__/
+*.pyc
+
+## Local SQLite DB
+neo_druidic.db
+
+## Secrets and env
+.env
+.env.local
+.env.*
+
+## Large model files
+models/*.gguf
+models/*.bin
+
+## Uploaded storage (user files)
+storage/
+
+## IDE/editor
+.vscode/
+.idea/
+
+## OS
+.DS_Store

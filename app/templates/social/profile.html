@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+{% if druid.profile_css %}
+<style id="awen-profile-style">
+{{ druid.profile_css | safe }}
+</style>
+{% endif %}
+
+<section class="profile card awen-profile">
+  <div class="awen-summary">
+    {% if druid.profile_image %}
+    <img
+      src="{{ url_for('social.profile_media', asset=druid.profile_image) }}"
+      alt="{{ druid.username }} avatar"
+      class="profile-avatar"
+    >
+    {% endif %}
+    <div>
+      <h1>{{ druid.username }}</h1>
+      <p>{{ druid.bio or "This member has not yet shared their story." }}</p>
+      
+      {% if druid.circle_membership %}
+      <p class="meta">Circle: {{ druid.circle_membership.circle.name }}</p>
+      {% endif %}
+    </div>
+  </div>
+  {% if current_user.is_authenticated and current_user.id == druid.id %}
+  <div class="awen-actions">
+    <a class="ghost-button" href="{{ url_for('social.edit_profile') }}">Edit AWEN01</a>
+  </div>
+  {% endif %}
+</section>
+
+<section class="profile-custom card">
+  {% if druid.profile_html %}
+    {{ druid.profile_html | safe }}
+  {% else %}
+    
+  {% endif %}
+</section>
+
+<section>
+  <h2>Recent Offerings</h2>
+  {% for entry in post_entries %}
+  {% set post = entry.record %}
+  <article class="card">
+    <div class="post-body">{{ entry.body_html }}</div>
+    {% if entry.preview %}
+    <a href="{{ entry.preview.url }}" target="_blank" rel="noopener" class="link-preview">
+      {% if entry.preview.image %}
+      <div class="link-preview-thumb" style="background-image: url('{{ entry.preview.image }}');"></div>
+      {% endif %}
+      <div class="link-preview-body">
+        <p class="link-preview-title">{{ entry.preview.title }}</p>
+        {% if entry.preview.description %}
+        <p class="link-preview-desc">{{ entry.preview.description }}</p>
+        {% endif %}
+        <span class="link-preview-domain">{{ entry.preview.domain }}</span>
+      </div>
+    </a>
+    {% endif %}
+    {% if post.ritual_focus %}
+    <p class="meta">Focus: {{ post.ritual_focus }}</p>
+    {% endif %}
+    <p class="meta">{{ post.created_at.strftime('%b %d, %Y %H:%M') }}</p>
+  </article>
+  {% else %}
+  <p>This member has not yet shared in the stream.</p>
+  {% endfor %}
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ super() }}
+{% if druid.profile_js %}
+<script id="awen-profile-script">
+{{ druid.profile_js | safe }}
+</script>
+{% endif %}
+{% endblock %}

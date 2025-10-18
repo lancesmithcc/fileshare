@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>AWEN01</h1>
+<form method="post" enctype="multipart/form-data" class="card form awen-edit">
+  <label>
+    Profile Image
+    <input type="file" name="profile_image" accept="image/png,image/jpeg,image/gif,image/webp">
+  </label>
+  <label>
+    Bio
+    <textarea name="bio" rows="4" placeholder="Share a short invocation or seasonal note.">{{ druid.bio or "" }}</textarea>
+  </label>
+  <label>
+    HTML
+    <textarea name="profile_html" rows="8" spellcheck="false" placeholder="<section>...</section>">{{ druid.profile_html or "" }}</textarea>
+  </label>
+  <label>
+  CSS
+    <textarea name="profile_css" rows="6" spellcheck="false" placeholder=".awen-profile { }">{{ druid.profile_css or "" }}</textarea>
+  </label>
+  <label>
+   JS
+    <textarea name="profile_js" rows="6" spellcheck="false" placeholder="console.log('Blessings');">{{ druid.profile_js or "" }}</textarea>
+  </label>
+  <button type="submit" class="button">Save AWEN01</button>
+</form>
+<p class="form-help">Custom code renders for everyone visiting your AWEN01 profile. Keep it respectful, performant, and safe.</p>
+{% endblock %}

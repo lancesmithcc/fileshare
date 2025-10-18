@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section
+  class="panel"
+  data-neod-root
+  data-treasury="{{ info.treasury_wallet if info else '' }}"
+  data-price-sol="{{ '{:.8f}'.format(info.price_sol) if info else '' }}"
+  data-price-lamports="{{ info.price_lamports if info else '' }}"
+  data-tokens-per-purchase="{{ info.tokens_per_purchase if info else '' }}"
+  data-web3-src="{{ url_for('static', filename='js/vendor/solana-web3.min.js') }}"
+  data-default-rpc="https://api.mainnet-beta.solana.com"
+  data-rpc-url="{{ info.rpc_url if info else '' }}"
+  data-purchase-url="{{ url_for('api.neod_purchase') }}"
+>
+  <div class="neod-hero">
+    <div class="neod-coin">
+      <span class="neod-coin-aurora"></span>
+      <img
+        src="{{ url_for('static', filename='img/triple.svg.png') }}"
+        alt="NEOD coin sigil"
+        class="neod-coin-mark"
+      >
+    </div>
+    <div class="neod-hero-copy">
+      <h1>NEOD</h1>
+      <p class="panel-subtitle">
+        Send 0.005&nbsp;SOL for every NEOD seed. The SOL moves straight into the treasury and our grove returns the matching token to your wallet automatically.
+      </p>
+    </div>
+  </div>
+
+  {% if service_error %}
+  <div class="flash flash-danger">{{ service_error }}</div>
+  {% else %}
+  <div class="neod-layout">
+    <section class="neod-exchange" aria-labelledby="neod-exchange-title">
+      <header>
+        <h2 id="neod-exchange-title">Instant NEOD Swap</h2>
+        <p>
+          Choose your SOL amount, connect a Solana wallet, and approve one transfer. Once the network confirms, the treasury dispenses NEOD back to the same wallet.
+        </p>
+      </header>
+
+      <div class="neod-field">
+        <label for="neod-amount">You Send (SOL)</label>
+        <div class="neod-amount-control">
+          <input
+            type="number"
+            id="neod-amount"
+            data-neod-amount
+            min="{{ '{:.3f}'.format(info.price_sol) if info else '0.005' }}"
+            step="0.001"
+            value="{{ '{:.3f}'.format(info.price_sol) if info else '0.005' }}"
+            inputmode="decimal"
+          >
+          <span class="neod-quote"><span data-neod-quote>{{ info.tokens_per_purchase if info else 1 }}</span> NEOD</span>
+        </div>
+        <p class="neod-hint">
+          Minimum {{ '{:.3f}'.format(info.price_sol) if info else '0.005' }}&nbsp;SOL ({{ info.tokens_per_purchase if info else 1 }}&nbsp;NEOD). Larger offerings scale automatically.
+        </p>
+      </div>
+
+      <div class="neod-wallet-actions">
+        <button type="button" class="pill pill-ghost" data-neod-connect>Connect Wallet</button>
+        <button type="button" class="pill pill-accent" data-neod-send disabled>Send SOL &amp; Receive NEOD</button>
+      </div>
+      <p class="neod-wallet-status" data-neod-status aria-live="polite"></p>
+    </section>
+
+    <section class="neod-insight">
+      <details class="neod-accordion">
+        <summary>Supply &amp; Treasury</summary>
+        <dl>
+          <div>
+            <dt>Treasury Wallet</dt>
+            <dd><code>{{ info.treasury_wallet }}</code></dd>
+          </div>
+          <div>
+            <dt>Mint Address</dt>
+            <dd><code>{{ info.mint_address }}</code></dd>
+          </div>
+          <div>
+            <dt>Exchange Rate</dt>
+            <dd>
+              {{ '{:.3f}'.format(info.price_sol) }}&nbsp;SOL ⇒ {{ info.tokens_per_purchase }}&nbsp;NEOD
+              <span class="neod-rate-note">({{ '{:,.0f}'.format(info.lamports_per_token) }} lamports per NEOD)</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Initial Supply</dt>
+            <dd>{{ "{:,}".format(info.initial_supply) }} NEOD</dd>
+          </div>
+          <div>
+            <dt>Treasury Balance</dt>
+            <dd>{{ "{:,}".format(info.available_supply) }} NEOD available</dd>
+          </div>
+        </dl>
+      </details>
+
+      <details class="neod-accordion">
+        <summary>How It Works</summary>
+        <ol>
+          <li>We prepare a SOL transfer to the treasury for the exact amount you choose.</li>
+          <li>You approve the transaction in your wallet; the SOL lands in the grove treasury.</li>
+          <li>Our backend verifies the signature and automatically sends NEOD back to your wallet.</li>
+        </ol>
+        <p class="neod-accordion-note">We create the associated NEOD token account automatically if it does not exist yet.</p>
+      </details>
+
+      <details class="neod-accordion">
+        <summary>Getting Started</summary>
+        <ol>
+          <li>
+            Install a Solana wallet extension such as
+            <a href="https://phantom.app/download" target="_blank" rel="noopener">Phantom</a>
+            in Chrome, Brave, or another Chromium-based browser. Follow the prompts to create or restore a wallet and back up your recovery phrase safely offline.
+          </li>
+          <li>
+            Fund the wallet with SOL. You can purchase SOL from exchanges like
+            <a href="https://crypto.com/" target="_blank" rel="noopener">Crypto.com</a>,
+            Coinbase, or Kraken, then withdraw to your Phantom public address.
+          </li>
+          <li>
+            Return here, connect Phantom with the button above, choose your SOL amount, and approve the transfer when Phantom prompts you.
+          </li>
+        </ol>
+        <p class="neod-accordion-note">
+          Phantom will display the SOL transaction details before you sign. Verify the amount and the recipient treasury address shown here: <code>{{ info.treasury_wallet if info else '' }}</code>.
+        </p>
+      </details>
+
+      <details class="neod-accordion">
+        <summary>Need Help?</summary>
+        <p class="neod-accordion-note">
+          If a transaction stalls, confirm it on Solscan and share the signature with the council. We can re-run the check without requiring another transfer.
+        </p>
+      </details>
+    </section>
+  </div>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <header class="panel-header">
+    <h2>Recent Offerings</h2>
+  </header>
+  {% if purchases %}
+  <div class="table-responsive">
+    <table class="neod-table">
+      <thead>
+        <tr>
+          <th scope="col">When</th>
+          <th scope="col">Signature</th>
+          <th scope="col">Recipient</th>
+          <th scope="col">SOL</th>
+          <th scope="col">NEOD</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for purchase in purchases %}
+        <tr>
+          <td>{{ purchase.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          <td class="mono"><code>{{ purchase.signature[:12] }}&hellip;</code></td>
+          <td class="mono"><code>{{ purchase.recipient_address[:12] }}&hellip;</code></td>
+          <td>{{ "{:.6f}".format(purchase.sol_lamports / 1_000_000_000) }}</td>
+          <td>{{ purchase.neod_amount }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>No offerings recorded yet. You could be the first to plant your seed coin.</p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/vendor/solana-web3.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/neod.js') }}?v=20250310"></script>
+{% endblock %}

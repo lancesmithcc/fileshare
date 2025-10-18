@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Sign In</h1>
+<form method="post" class="card form">
+  <label>
+    Druid Name
+    <input type="text" name="username" required autofocus>
+  </label>
+  <label>
+    Passphrase
+    <input type="password" name="password" required>
+  </label>
+  <label class="checkbox">
+    <input type="checkbox" name="remember">
+    Remember me beside the sacred fire
+  </label>
+  <button type="submit" class="button">Enter</button>
+</form>
+<p>No credentials yet? <a href="{{ url_for('auth.register') }}">Join the circle.</a></p>
+{% endblock %}

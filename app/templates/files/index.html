@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hollow-shell" data-current-folder="{{ current_folder.id if current_folder else '' }}">
+  <header class="hollow-toolbar" role="presentation">
+    <div class="hollow-window-controls" aria-hidden="true">
+      <span class="control-red"></span>
+      <span class="control-amber"></span>
+      <span class="control-green"></span>
+    </div>
+    <div class="toolbar-title">Shared Hollow</div>
+    <div class="toolbar-actions">
+      <button type="button" class="toolbar-button" data-open-picker>Upload</button>
+      <button type="button" class="toolbar-button" data-toggle-folder aria-expanded="false" aria-controls="folder-create-form">New Folder</button>
+    </div>
+  </header>
+  <div class="hollow-body">
+    <nav class="hollow-breadcrumbs" aria-label="Folder breadcrumbs">
+      <a href="{{ url_for('files.index') }}" class="crumb{% if not current_folder %} is-current{% endif %}" data-folder-target="">Shared Hollow</a>
+      {% for crumb in breadcrumbs %}
+      <span class="crumb-divider">›</span>
+      {% if loop.last %}
+      <span class="crumb is-current">{{ crumb.name }}</span>
+      {% else %}
+      <a href="{{ url_for('files.index', folder=crumb.id) }}" class="crumb" data-folder-target="{{ crumb.id }}">{{ crumb.name }}</a>
+      {% endif %}
+      {% endfor %}
+    </nav>
+
+    <form id="hollow-upload-form" action="{{ url_for('files.upload') }}" method="post" enctype="multipart/form-data" class="hollow-upload">
+      <input type="file" id="file" name="file" required class="file-input-visually-hidden">
+      <input type="hidden" name="folder_id" value="{{ current_folder.id if current_folder else '' }}">
+      <div id="hollow-dropzone" class="hollow-dropzone" role="button" tabindex="0" aria-label="Upload a file to the Shared Hollow" data-folder-label="{{ current_folder.name if current_folder else 'Shared Hollow' }}" data-open-picker>
+        <div class="dropzone-inner">
+          <div class="drop-icon" aria-hidden="true"></div>
+          <p class="drop-primary">Drag and release to share, or <span class="drop-action" data-open-picker>browse your grove</span>.</p>
+          <p class="drop-secondary">Files land in {{ current_folder.name if current_folder else 'Shared Hollow' }}.</p>
+          <p class="drop-selected" data-placeholder="No file selected">No file selected</p>
+        </div>
+      </div>
+    </form>
+
+    <form id="folder-create-form" class="folder-form hidden" method="post" action="{{ url_for('files.create_folder') }}">
+      <input type="hidden" name="parent_id" value="{{ current_folder.id if current_folder else '' }}">
+      <label for="folder-name" class="sr-only">Folder name</label>
+      <input id="folder-name" type="text" name="name" placeholder="Untitled folder" required>
+      <button type="submit" class="pill pill-accent">Create</button>
+    </form>
+
+    <div class="desktop-surface" id="desktop-surface" data-folder-id="{{ current_folder.id if current_folder else '' }}">
+      {% for folder in folders %}
+      <article
+        class="desktop-icon folder-icon"
+        data-folder-id="{{ folder.id }}" data-open-url="{{ url_for('files.index', folder=folder.id) }}"
+        data-pos-x="{{ folder.pos_x }}"
+        data-pos-y="{{ folder.pos_y }}"
+        draggable="false"
+      >
+        <a class="icon-hit" href="{{ url_for('files.index', folder=folder.id) }}" data-open-folder="{{ folder.id }}" draggable="false"></a>
+        <div class="icon-visual folder-visual" aria-hidden="true">
+          <span class="folder-tab"></span>
+          <span class="folder-body"></span>
+          {% set preview = folder.files[0] if folder.files else None %}
+          {% if preview and preview.mime_type and preview.mime_type.startswith('image/') %}
+          <span class="folder-preview" style="background-image: url('{{ url_for('files.preview', file_id=preview.id) }}');"></span>
+          {% endif %}
+        </div>
+        <div class="icon-label" data-label>{{ folder.name }}</div>
+        <form method="post" action="{{ url_for('files.rename_folder', folder_id=folder.id) }}" class="rename-form hidden" data-folder-rename="{{ folder.id }}">
+          <input type="hidden" name="current_folder_id" value="{{ current_folder.id if current_folder else '' }}">
+          <label class="sr-only" for="rename-folder-{{ folder.id }}">Rename {{ folder.name }}</label>
+          <input id="rename-folder-{{ folder.id }}" type="text" name="name" value="{{ folder.name }}" maxlength="120" required>
+          <div class="rename-actions">
+            <button type="submit" class="pill pill-accent">Save</button>
+            <button type="button" class="pill pill-ghost" data-cancel-rename>Cancel</button>
+          </div>
+        </form>
+        <form method="post" action="{{ url_for('files.delete_folder', folder_id=folder.id) }}" class="icon-hidden-form" data-delete-form="folder">
+          <input type="hidden" name="current_folder_id" value="{{ current_folder.id if current_folder else '' }}">
+        </form>
+      </article>
+      {% endfor %}
+
+      {% for file in files %}
+      {% set share_state = "enabled" if file.share_token else "disabled" %}
+      {% set share_url = url_for('files.shared_download', token=file.share_token, _external=True) if file.share_token else "" %}
+      <article
+        class="desktop-icon file-icon"
+        data-file-id="{{ file.id }}" data-download-url="{{ url_for('files.download', file_id=file.id) }}"
+        data-pos-x="{{ file.pos_x }}"
+        data-pos-y="{{ file.pos_y }}"
+        data-ext="{{ file.original_name.split('.')[-1]|upper }}"
+        data-share-state="{{ share_state }}"
+        {% if share_url %}data-share-url="{{ share_url }}"{% endif %}
+        draggable="false"
+      >
+        <div class="icon-visual file-visual {% if file.mime_type and file.mime_type.startswith('image/') %}is-image{% endif %}">
+          {% if file.mime_type and file.mime_type.startswith('image/') %}
+          <img src="{{ url_for('files.preview', file_id=file.id) }}" alt="{{ file.original_name }} preview">
+          {% else %}
+          <span class="file-extension" aria-hidden="true">{{ file.original_name.split('.')[-1]|upper }}</span>
+          {% endif %}
+        </div>
+        <div class="icon-label" data-label>{{ file.original_name }}</div>
+        <form method="post" action="{{ url_for('files.rename_file', file_id=file.id) }}" class="rename-form hidden" data-file-rename="{{ file.id }}">
+          <input type="hidden" name="current_folder_id" value="{{ current_folder.id if current_folder else '' }}">
+          <label class="sr-only" for="rename-file-{{ file.id }}">Rename {{ file.original_name }}</label>
+          <input id="rename-file-{{ file.id }}" type="text" name="name" value="{{ file.original_name }}" maxlength="255" required>
+          <div class="rename-actions">
+            <button type="submit" class="pill pill-accent">Save</button>
+            <button type="button" class="pill pill-ghost" data-cancel-rename>Cancel</button>
+          </div>
+        </form>
+        <form action="{{ url_for('files.delete', file_id=file.id) }}" method="post" class="icon-hidden-form" data-delete-form="file">
+          <input type="hidden" name="current_folder_id" value="{{ current_folder.id if current_folder else '' }}">
+        </form>
+        {% if file.share_token %}
+        <form action="{{ url_for('files.enable_share', file_id=file.id) }}" method="post" class="icon-hidden-form" data-share-rotate-form>
+          <input type="hidden" name="rotate" value="1">
+          <input type="hidden" name="current_folder_id" value="{{ current_folder.id if current_folder else '' }}">
+        </form>
+        <form action="{{ url_for('files.disable_share', file_id=file.id) }}" method="post" class="icon-hidden-form" data-share-disable-form>
+          <input type="hidden" name="current_folder_id" value="{{ current_folder.id if current_folder else '' }}">
+        </form>
+        {% else %}
+        <form action="{{ url_for('files.enable_share', file_id=file.id) }}" method="post" class="icon-hidden-form" data-share-enable-form>
+          <input type="hidden" name="current_folder_id" value="{{ current_folder.id if current_folder else '' }}">
+        </form>
+        {% endif %}
+        <form action="{{ url_for('files.move', file_id=file.id) }}" method="post" class="move-form" hidden>
+          <input type="hidden" name="current_folder_id" value="{{ current_folder.id if current_folder else '' }}">
+          <input type="hidden" name="folder_id" value="">
+        </form>
+      </article>
+      {% endfor %}
+    </div>
+
+    <div class="desktop-context-menu hidden" id="desktop-context-menu" role="menu" aria-hidden="true">
+      <button type="button" data-context-action="open">Open</button>
+      <button type="button" data-context-action="download">Download</button>
+      <button type="button" data-context-action="rename">Rename</button>
+      <button type="button" data-context-action="share-copy">Copy Share Link</button>
+      <button type="button" data-context-action="share-enable">Enable Sharing</button>
+      <button type="button" data-context-action="share-rotate">Rotate Link</button>
+      <button type="button" data-context-action="share-disable">Disable Sharing</button>
+      <button type="button" data-context-action="delete">Delete</button>
+    </div>
+
+    {% if not folders and not files %}
+    <p class="hollow-empty">No files yet. Drag something into the aurora desk to begin sharing.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

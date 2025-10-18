@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Living Circles</h1>
+
+<div class="circle-cta">
+  <a class="button" href="#create-circle">Found a Circle</a>
+</div>
+
+<section class="circle-section card" id="create-circle">
+  <h2>Found a New Circle</h2>
+  <form method="post" action="{{ url_for('social.circles') }}" class="form circle-form">
+    <label>
+      Circle Name
+      <input type="text" name="circle_name" required maxlength="80" placeholder="Moonlit Grove">
+    </label>
+    <label>
+      Description
+      <textarea name="circle_description" rows="3" placeholder="Describe the circle's focus and rhythm."></textarea>
+    </label>
+    <button type="submit" class="button">Create Circle</button>
+  </form>
+</section>
+
+<section class="circle-section card">
+  <header class="circle-header">
+    <div>
+      <h2>{{ all_circle.name }}</h2>
+      <p class="meta">{{ all_circle.description }}</p>
+    </div>
+    <span class="meta">{{ all_circle.members|length }} members</span>
+  </header>
+  <div class="circle-member-list">
+    {% for member in all_circle.members %}
+    <a href="{{ url_for('social.profile', username=member.username) }}" class="circle-member">
+      <span class="status-dot {{ member.is_online and 'online' or 'offline' }}" aria-hidden="true"></span>
+      {% if member.profile_image %}
+      <img src="{{ url_for('social.profile_media', asset=member.profile_image) }}" alt="{{ member.username }} avatar" class="avatar avatar-sm">
+      {% else %}
+      <img src="{{ url_for('static', filename='img/triple.svg.png') }}" alt="{{ member.username }} avatar" class="avatar avatar-sm">
+      {% endif %}
+      <span>{{ member.username }}</span>
+    </a>
+    {% else %}
+    <p>This circle is waiting for its first members.</p>
+    {% endfor %}
+  </div>
+</section>
+
+{% if circle_sections %}
+  {% for circle in circle_sections %}
+  <section class="circle-section card">
+    <header class="circle-header">
+      <div>
+        <h2>{{ circle.name }}</h2>
+        <p class="meta">{{ circle.description }}</p>
+      </div>
+      <div class="circle-actions">
+        <span class="meta">{{ circle.members|length }} member{{ circle.members|length != 1 and 's' or '' }}</span>
+        {% if current_user.is_arch %}
+        <form method="post" action="{{ url_for('social.delete_circle', circle_id=circle.id) }}" class="circle-delete-form">
+          <button type="submit" class="ghost-button danger-button">Delete</button>
+        </form>
+        {% endif %}
+      </div>
+    </header>
+    <div class="circle-member-list">
+      {% for member in circle.members %}
+      <a href="{{ url_for('social.profile', username=member.username) }}" class="circle-member">
+        <span class="status-dot {{ member.is_online and 'online' or 'offline' }}" aria-hidden="true"></span>
+        {% if member.profile_image %}
+        <img src="{{ url_for('social.profile_media', asset=member.profile_image) }}" alt="{{ member.username }} avatar" class="avatar avatar-sm">
+        {% else %}
+        <img src="{{ url_for('static', filename='img/triple.svg.png') }}" alt="{{ member.username }} avatar" class="avatar avatar-sm">
+        {% endif %}
+        <span>{{ member.username }}</span>
+      </a>
+      {% else %}
+      <p>No members have joined this circle yet.</p>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+{% else %}
+  <p class="meta">No other circles have formed yet. Found one when you register or update your grove.</p>
+{% endif %}
+{% endblock %}

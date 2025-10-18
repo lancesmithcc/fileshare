@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="arch-header">
+  <h1>Arch Sanctum</h1>
+  <p>Steward site access, tune the look and feel, and guide the circle.</p>
+</section>
+
+<section class="arch-section">
+  <h2>Pending Members</h2>
+  {% if pending_members %}
+  <table class="arch-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Grove</th>
+        <th class="arch-actions">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for member in pending_members %}
+      <tr>
+        <td>{{ member.username }}</td>
+        <td>{{ member.email }}</td>
+        <td>{{ member.grove or "—" }}</td>
+        <td class="arch-actions">
+          <div class="arch-inline-actions">
+            <form method="post" action="{{ url_for('arch.approve_user', user_id=member.id) }}">
+              <button type="submit" class="button">Approve</button>
+            </form>
+            <form method="post" action="{{ url_for('arch.delete_user', user_id=member.id) }}" class="arch-danger-form">
+              <button type="submit" class="ghost-button danger-button">Delete</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No one waits at the threshold.</p>
+  {% endif %}
+</section>
+
+<section class="arch-section">
+  <h2>Active Members</h2>
+  {% if active_members %}
+  <table class="arch-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th class="arch-actions">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for member in active_members %}
+      <tr>
+        <td>{{ member.username }}</td>
+        <td>{{ member.email }}</td>
+        <td>
+          {% if member.is_arch %}
+          Arch Druid
+          {% else %}
+          Member
+          {% endif %}
+        </td>
+        <td class="arch-actions">
+          {% if not member.is_arch %}
+          <div class="arch-inline-actions">
+            <form method="post" action="{{ url_for('arch.suspend_user', user_id=member.id) }}" class="arch-suspend-form">
+              <div class="arch-duration">
+                <input type="number" name="duration_value" min="1" step="1" required placeholder="Amount">
+                <select name="duration_unit">
+                  <option value="hours">Hours</option>
+                  <option value="days" selected>Days</option>
+                  <option value="weeks">Weeks</option>
+                </select>
+              </div>
+              <button type="submit" class="ghost-button">Suspend</button>
+            </form>
+            <form method="post" action="{{ url_for('arch.delete_user', user_id=member.id) }}" class="arch-danger-form">
+              <button type="submit" class="ghost-button danger-button">Delete</button>
+            </form>
+          </div>
+          {% else %}
+          —
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No active members found.</p>
+  {% endif %}
+</section>
+
+<section class="arch-section">
+  <h2>Suspended Members</h2>
+  {% if suspended_members %}
+  <table class="arch-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Suspended Until</th>
+        <th class="arch-actions">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for member in suspended_members %}
+      <tr>
+        <td>{{ member.username }}</td>
+        <td>{{ member.email }}</td>
+        <td>
+          {% if member.suspended_until %}
+          {{ member.suspended_until.strftime('%Y-%m-%d %H:%M UTC') }}
+          {% else %}
+          Indefinite
+          {% endif %}
+        </td>
+        <td class="arch-actions">
+          <div class="arch-inline-actions">
+            <form method="post" action="{{ url_for('arch.unsuspend_user', user_id=member.id) }}">
+              <button type="submit" class="button">Unsuspend</button>
+            </form>
+            <form method="post" action="{{ url_for('arch.suspend_user', user_id=member.id) }}" class="arch-suspend-form">
+              <div class="arch-duration">
+                <input type="number" name="duration_value" min="1" step="1" required placeholder="Amount">
+                <select name="duration_unit">
+                  <option value="hours">Hours</option>
+                  <option value="days" selected>Days</option>
+                  <option value="weeks">Weeks</option>
+                </select>
+              </div>
+              <button type="submit" class="ghost-button">Extend</button>
+            </form>
+            <form method="post" action="{{ url_for('arch.delete_user', user_id=member.id) }}" class="arch-danger-form">
+              <button type="submit" class="ghost-button danger-button">Delete</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No members are currently suspended.</p>
+  {% endif %}
+</section>
+
+<section class="arch-section">
+  <h2>Site Identity &amp; Copy</h2>
+  <form method="post" action="{{ url_for('arch.store_settings') }}" class="arch-form">
+    <div class="field">
+      <label for="site_title">Site Title</label>
+      <input id="site_title" name="site_title" type="text" value="{{ settings.site_title }}" required>
+    </div>
+    <div class="field">
+      <label for="hero_title">Landing Headline</label>
+      <input id="hero_title" name="hero_title" type="text" value="{{ settings.hero_title }}" required>
+    </div>
+    <div class="field">
+      <label for="hero_subtitle">Landing Subheading</label>
+      <input id="hero_subtitle" name="hero_subtitle" type="text" value="{{ settings.hero_subtitle }}" required>
+    </div>
+    <div class="field">
+      <label for="landing_description">Landing Description</label>
+      <textarea id="landing_description" name="landing_description" rows="4">{{ settings.landing_description }}</textarea>
+    </div>
+    <button type="submit" class="button">Save Copy</button>
+  </form>
+</section>
+
+<section class="arch-section">
+  <h2>Custom CSS</h2>
+  <form method="post" action="{{ url_for('arch.store_settings') }}" class="arch-form">
+    <div class="field">
+      <label for="custom_css">Stylesheet Override</label>
+      <textarea id="custom_css" name="custom_css" rows="10" spellcheck="false">{{ settings.custom_css }}</textarea>
+    </div>
+    <button type="submit" class="button">Save Styles</button>
+  </form>
+</section>
+{% endblock %}
