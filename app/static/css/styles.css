@@ -651,7 +651,7 @@ img {
 }
 
 .nav-toggle {
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
   justify-content: center;
   padding: 0.5rem;
@@ -665,6 +665,7 @@ img {
   min-height: 48px;
   position: relative;
   z-index: 100;
+  margin-left: auto;
 }
 
 .nav-toggle:hover,
@@ -782,10 +783,6 @@ img {
   .nav-brand {
     display: flex;
     align-items: center;
-  }
-
-  .nav-toggle {
-    display: inline-flex;
   }
 
   .nav-links {
