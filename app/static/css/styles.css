@@ -8,6 +8,14 @@
     url("../fonts/Jost-Variable.ttf") format("truetype");
 }
 
+input,
+textarea,
+select {
+  border-radius: 22px !important;
+}
+
+input, textarea, select{border-radius:22px !important;}
+
 :root {
   color-scheme: light dark;
   --font-sans: "Jost", "Segoe UI", Tahoma, sans-serif;
@@ -31,6 +39,10 @@ body {
   background-color: var(--bg);
   position: relative;
   overflow-x: hidden;
+}
+
+body.nav-is-open {
+  overflow: hidden;
 }
 
 body::before {
@@ -107,6 +119,11 @@ a {
 
 a:hover {
   text-decoration: underline;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
 }
 
 .glyph {
@@ -597,18 +614,66 @@ a:hover {
 
 .nav {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 1.5rem;
   padding: 1rem 2rem;
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
+.nav-inner {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
 .nav-links {
   display: flex;
   align-items: center;
   gap: 1rem;
+  margin-left: auto;
+}
+
+.nav-links.is-open {
+  display: flex;
+}
+
+.nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(16, 20, 24, 0.72);
+  color: inherit;
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease, color 180ms ease;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.nav-toggle:hover,
+.nav-toggle.is-active,
+.nav-toggle:focus-visible {
+  background: rgba(16, 20, 24, 0.92);
+  border-color: rgba(255, 255, 255, 0.25);
+  outline: none;
+}
+
+.nav-toggle-icon {
+  font-size: 1.75rem;
+  line-height: 1;
+  display: inline-block;
+  transition: transform 200ms ease;
+  color: #ffffff;
+}
+
+.nav-toggle.is-active .nav-toggle-icon {
+  transform: scale(0.85) rotate(90deg);
 }
 
 .nav a {
@@ -636,6 +701,17 @@ a:hover {
   white-space: nowrap;display:none;
 }
 
+@keyframes navReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .nav .inline-form {
   display: inline;
 }
@@ -648,6 +724,116 @@ a:hover {
 }
 .nav-links a{background:#000;padding:5px 10px;border-radius:11px;transition:ease-in-out;}
 .nav-links a:hover{background:#111;text-decoration:none;transform: scale(1.1);}
+
+.nav-links.is-open .linkish {
+  display: block;
+}
+
+.nav-overlay {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .brand-logo {
+    width: 110px;
+  }
+}
+
+@media (max-width: 768px) {
+  .nav {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem 1rem;
+    background: linear-gradient(135deg, rgba(10, 16, 22, 0.96), rgba(16, 22, 28, 0.88));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .nav-inner {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .nav-brand {
+    display: flex;
+    align-items: center;
+  }
+
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  .nav-links {
+    width: 100%;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.55rem;
+    padding: 0.75rem;
+    border-radius: 18px;
+    background: rgba(8, 12, 16, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 28px 52px -30px rgba(0, 0, 0, 0.85);
+    transform-origin: top;
+    margin-left: 0;
+  }
+
+  .nav-links.is-open {
+    display: flex;
+    animation: navReveal 200ms ease;
+  }
+
+  .nav-links a {
+    margin-right: 0;
+    width: 100%;
+    text-align: center;
+    padding: 0.65rem;
+    display: block;
+  }
+
+  .nav-links .inline-form {
+    display: block;
+    width: 100%;
+  }
+
+  .nav .linkish {
+    width: 100%;
+    padding: 0.65rem;
+    border-radius: 11px;
+    background: #000;
+  }
+
+  .nav-links a:hover,
+  .nav .linkish:hover {
+    transform: none;
+  }
+
+  .nav-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 8, 12, 0.62);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+    transition: opacity 180ms ease;
+    z-index: 9;
+  }
+
+  .nav-overlay.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+    visibility: visible;
+  }
+
+  .brand-logo {
+    width: clamp(88px, 32vw, 110px);
+  }
+}
 
 .container {
   max-width: 1100px;
@@ -2217,6 +2403,104 @@ a:hover {
   }
 }
 
+@media (max-width: 600px) {
+  .container {
+    margin: 1.5rem auto;
+    padding: 0 0.85rem;
+  }
+
+  .card,
+  .panel {
+    padding: 1.2rem;
+    border-radius: 20px;
+  }
+
+  .hero {
+    padding: 3rem 0.85rem;
+  }
+
+  .cta {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .cta .button,
+  .cta .ghost-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .grid {
+    gap: 1.1rem;
+  }
+
+  .primary-column,
+  .sidebar {
+    gap: 1.1rem;
+  }
+
+  .awen-summary {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .profile-avatar {
+    width: clamp(110px, 48vw, 160px);
+    height: clamp(110px, 48vw, 160px);
+  }
+
+  .awen-actions {
+    justify-content: flex-start;
+  }
+
+  .table-responsive {
+    margin: 0 -0.85rem;
+    padding: 0 0.85rem;
+  }
+
+  .arch-section {
+    margin: 2rem 0;
+  }
+
+  .arch-inline-actions {
+    justify-content: flex-start;
+  }
+
+  .arch-actions {
+    text-align: left;
+  }
+
+  .arch-duration {
+    flex-wrap: wrap;
+  }
+
+  .circle-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .desktop-surface {
+    min-height: 360px;
+    border-radius: 20px;
+  }
+
+  .desktop-icon {
+    width: 112px;
+    gap: 0.5rem;
+  }
+
+  .desktop-icon .icon-visual {
+    width: 80px;
+    height: 80px;
+    border-radius: 20px;
+  }
+
+  .neod-layout {
+    gap: 1.2rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hollow-shell::before,
   .archdruid-card::before,
@@ -2233,4 +2517,3 @@ a:hover {
     transform: none;
   }
 }
-input, textarea, select{border-radius:22px !important;}
