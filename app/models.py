@@ -286,7 +286,11 @@ def ensure_file_schema() -> None:
     engine = db.get_engine()
     with engine.begin() as connection:
         FileFolder.__table__.create(bind=connection, checkfirst=True)
-        columns = {row[1] for row in connection.execute(text("PRAGMA table_info('file_assets')"))}
+        
+        # PostgreSQL-compatible column check
+        inspector = sa.inspect(engine)
+        columns = {col['name'] for col in inspector.get_columns('file_assets')}
+        
         if "folder_id" not in columns:
             connection.execute(text("ALTER TABLE file_assets ADD COLUMN folder_id INTEGER"))
         if "pos_x" not in columns:
@@ -294,7 +298,7 @@ def ensure_file_schema() -> None:
         if "pos_y" not in columns:
             connection.execute(text("ALTER TABLE file_assets ADD COLUMN pos_y REAL DEFAULT 0"))
 
-        folder_columns = {row[1] for row in connection.execute(text("PRAGMA table_info('file_folders')"))}
+        folder_columns = {col['name'] for col in inspector.get_columns('file_folders')}
         if "pos_x" not in folder_columns:
             connection.execute(text("ALTER TABLE file_folders ADD COLUMN pos_x REAL DEFAULT 0"))
         if "pos_y" not in folder_columns:
@@ -310,13 +314,16 @@ def ensure_user_schema() -> None:
     """Add role/status metadata to users for admin and approval controls."""
     engine = db.get_engine()
     with engine.begin() as connection:
-        columns = {row[1] for row in connection.execute(text("PRAGMA table_info('users')"))}
+        # PostgreSQL-compatible column check
+        inspector = sa.inspect(engine)
+        columns = {col['name'] for col in inspector.get_columns('users')}
+        
         if "role" not in columns:
-            connection.execute(text("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'member'"))
+            connection.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(32) DEFAULT 'member'"))
         if "status" not in columns:
-            connection.execute(text("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'"))
+            connection.execute(text("ALTER TABLE users ADD COLUMN status VARCHAR(16) DEFAULT 'active'"))
         if "profile_image" not in columns:
-            connection.execute(text("ALTER TABLE users ADD COLUMN profile_image TEXT"))
+            connection.execute(text("ALTER TABLE users ADD COLUMN profile_image VARCHAR(255)"))
         if "profile_html" not in columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN profile_html TEXT"))
         if "profile_css" not in columns:
@@ -324,21 +331,25 @@ def ensure_user_schema() -> None:
         if "profile_js" not in columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN profile_js TEXT"))
         if "suspended_until" not in columns:
-            connection.execute(text("ALTER TABLE users ADD COLUMN suspended_until TEXT"))
+            connection.execute(text("ALTER TABLE users ADD COLUMN suspended_until TIMESTAMP"))
         if "last_seen" not in columns:
-            connection.execute(text("ALTER TABLE users ADD COLUMN last_seen TEXT"))
+            connection.execute(text("ALTER TABLE users ADD COLUMN last_seen TIMESTAMP"))
 
 
 def ensure_circle_schema() -> None:
     """Ensure circles track creation timestamp."""
     engine = db.get_engine()
     with engine.begin() as connection:
-        columns = {row[1] for row in connection.execute(text("PRAGMA table_info('circles')"))}
+        # PostgreSQL-compatible column check
+        inspector = sa.inspect(engine)
+        columns = {col['name'] for col in inspector.get_columns('circles')}
+        
         if "created_at" not in columns:
-            connection.execute(text("ALTER TABLE circles ADD COLUMN created_at TEXT"))
+            connection.execute(text("ALTER TABLE circles ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"))
+        # Only update NULL values with current timestamp
         connection.execute(
             text(
-                "UPDATE circles SET created_at = COALESCE(created_at, strftime('%Y-%m-%dT%H:%M:%f','now'))"
+                "UPDATE circles SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL"
             )
         )
 

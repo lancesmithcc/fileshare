@@ -225,11 +225,22 @@ class NeodService:
             raise ServiceConfigurationError("Failed to load NEOD mint details.") from exc
         token_client = self._ensure_token_client()
         source_account = self._get_or_create_associated_account(self._keypair.public_key)
+        current_balance = 0
         try:
             source_details = token_client.get_account_info(source_account)
             current_balance = int(source_details.amount)
-        except Exception:
-            current_balance = 0
+            self.logger.info("Treasury balance: %s NEOD tokens", current_balance)
+        except Exception as exc:
+            self.logger.warning("Failed to fetch treasury balance, defaulting to 0: %s", exc)
+            # Try direct RPC call as fallback
+            try:
+                response = self.client.get_token_account_balance(source_account)
+                if isinstance(response, dict) and 'result' in response:
+                    balance_info = response['result'].get('value', {})
+                    current_balance = int(balance_info.get('amount', 0))
+                    self.logger.info("Treasury balance (via direct RPC): %s NEOD tokens", current_balance)
+            except Exception as rpc_exc:
+                self.logger.error("Direct RPC balance check also failed: %s", rpc_exc)
 
         tokens_per_unit = max(self.neod_per_purchase, 1)
         lamports_per_token = max(1, int(self.min_lamports / tokens_per_unit))

@@ -1,4 +1,12 @@
 (() => {
+  // Polyfill for Buffer (required by Solana web3.js in browser)
+  if (typeof window !== "undefined" && typeof window.Buffer === "undefined") {
+    window.Buffer = window.Buffer || {
+      from: (data) => new Uint8Array(data),
+      isBuffer: () => false,
+    };
+  }
+
   const LAMPORTS_PER_SOL = 1_000_000_000;
 
   const ready = () => {
@@ -78,7 +86,7 @@
       if (web3Promise) {
         return web3Promise;
       }
-      const src = root.dataset.web3Src || "https://unpkg.com/@solana/web3.js@1.95.3/dist/web3.min.js";
+      const src = root.dataset.web3Src || "https://unpkg.com/@solana/web3.js@1.87.6/lib/index.iife.min.js";
       web3Promise = new Promise((resolve, reject) => {
         const script = document.createElement("script");
         script.src = src;
@@ -184,67 +192,72 @@
         if (!lamports || !tokens) {
           throw new Error("Increase the SOL amount to receive at least one NEOD.");
         }
-        const web3 = await ensureWeb3();
+        
         sendButton.disabled = true;
         sendButton.dataset.loading = "1";
-        setStatus(`Sending ${formatSol(amountSol)} SOL to the treasury...`, "muted");
+        setStatus(`Preparing ${formatSol(amountSol)} SOL transfer...`, "muted");
 
-        let connection = new web3.Connection(rpcUrl, "confirmed");
+        // Ensure lamports is a safe integer
+        const lamportsInt = Math.floor(lamports);
+        
+        // Load web3 library
+        const web3 = await ensureWeb3();
+        
+        setStatus(`Creating transaction...`, "muted");
+        
+        // Get connection for recent blockhash
+        const connection = new web3.Connection(
+          rpcUrl || "https://api.mainnet-beta.solana.com",
+          "confirmed"
+        );
+        
         const fromPubkey = new web3.PublicKey(owner);
         const toPubkey = new web3.PublicKey(treasury);
-        let blockhashInfo;
-        try {
-          blockhashInfo = await connection.getLatestBlockhash("finalized");
-        } catch (primaryError) {
-          if (rpcUrl !== fallbackRpc) {
-            try {
-              connection = new web3.Connection(fallbackRpc, "confirmed");
-              blockhashInfo = await connection.getLatestBlockhash("finalized");
-              setStatus("Primary Solana RPC unavailable; using a public fallback endpoint.", "muted");
-            } catch (fallbackError) {
-              throw fallbackError;
-            }
-          } else {
-            throw primaryError;
-          }
-        }
-        const { blockhash, lastValidBlockHeight } = blockhashInfo;
-
+        
+        // Get recent blockhash
+        const { blockhash } = await connection.getLatestBlockhash("confirmed");
+        
+        // Create transaction using Transaction class
         const transaction = new web3.Transaction({
+          recentBlockhash: blockhash,
           feePayer: fromPubkey,
-          blockhash,
-          lastValidBlockHeight,
-        }).add(
+        });
+        
+        // Add transfer instruction using SystemProgram
+        transaction.add(
           web3.SystemProgram.transfer({
-            fromPubkey,
-            toPubkey,
-            lamports,
-          }),
+            fromPubkey: fromPubkey,
+            toPubkey: toPubkey,
+            lamports: lamportsInt,
+          })
         );
 
+        setStatus(`Awaiting approval in Phantom...`, "muted");
+
+        // Sign and send via Phantom
         const { signature } = await provider.signAndSendTransaction(transaction);
-        setStatus(`Transaction submitted: ${shortKey(signature)}. Awaiting confirmation...`, "muted");
+        setStatus(`Transaction sent: ${shortKey(signature)}. Confirming...`, "muted");
 
-        await connection.confirmTransaction(
-          {
-            signature,
-            blockhash,
-            lastValidBlockHeight,
-          },
-          "confirmed",
-        );
+        // Wait for confirmation
+        await new Promise(resolve => setTimeout(resolve, 3000));
 
+        // Call our backend to verify and send NEOD
         const response = await fetch(purchaseUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest"
+          },
+          credentials: "same-origin",
           body: JSON.stringify({
             signature,
             recipient: owner,
           }),
         });
+        
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
-          const message = payload?.error || "Treasury could not deliver NEOD. Contact support with your signature.";
+          const message = payload?.error || "Treasury could not deliver NEOD. Contact support with your signature: " + signature;
           throw new Error(message);
         }
 

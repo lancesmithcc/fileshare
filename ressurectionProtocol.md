@@ -1,19 +1,24 @@
 
-# Resurrection Protocol — fileshare
+# Resurrection Protocol — Neo Druidic Society
+
+**Site URL:** https://awen01.cc (and https://www.awen01.cc)
 
 Purpose: step-by-step, AI- and human-readable instructions to bring the site back online if it goes down. Follow these steps in order. Each step includes exact commands where applicable and checks to confirm success.
 
 Format contract (short):
-- Inputs: access to the server (SSH), project root at /home/bodhi/neo-druidic-society, ability to run shell commands.
-- Outputs: running Flask process and active Cloudflare Tunnel exposing the app, logs showing successful start.
-- Error modes: missing cloudflared binary, missing cloudflared credentials/config, missing virtualenv or dependencies, Flask runtime errors.
+- Inputs: access to the server (SSH), project root at /home/lanc3lot/neo-druidic-society, ability to run shell commands.
+- Outputs: running Flask process on port 8000 and active Cloudflare Tunnel exposing the app at https://awen01.cc, logs showing successful start.
+- Error modes: missing cloudflared binary, missing cloudflared credentials/config, missing virtualenv or dependencies, Flask runtime errors, port mismatch (must be 8000).
 
 High level steps (quick):
 1) Check process and logs
 2) Verify cloudflared and tunnel credentials
 3) Verify Python virtualenv and env vars
-4) Start services using run_fileshare.sh
-5) Troubleshoot common errors
+4) Start services using start_services.sh (NEW - replaces run_fileshare.sh)
+5) Verify site is accessible at https://awen01.cc
+6) Troubleshoot common errors
+
+**CRITICAL:** Flask MUST run on port 8000 to match Cloudflare tunnel configuration!
 
 Detailed steps
 
@@ -23,108 +28,243 @@ Detailed steps
   - ps and grepping for cloudflared and flask:
     ps aux | grep -E "(cloudflared|flask)" | grep -v grep
   - Tail the tunnel and application logs that live in project `logs/`:
-    tail -n 200 logs/fileshare_supervisor.log
-    tail -n 200 logs/application.log
+    tail -n 50 logs/cloudflared.log
+    tail -n 50 logs/flask.log
+    tail -n 50 logs/application.log
 
-  Expected: `fileshare_supervisor.log` shows recent `Starting cloudflared tunnel 'fileshare'` lines and registered connections; `application.log` shows app startup messages. If either log is absent, proceed to step 2 and 3.
+  Expected: `cloudflared.log` shows recent tunnel connection messages; `flask.log` shows Flask startup on port 8000; `application.log` shows app startup messages. If logs are absent or show errors, proceed to step 2 and 3.
 
 2) Verify cloudflared installation and credentials
 
 - Check cloudflared binary:
   - command -v cloudflared || echo "cloudflared not found"
 
-- Check Cloudflare config file (used by `run_fileshare.sh`):
+- Check Cloudflare config file:
   - CONFIG_PATH="$HOME/.cloudflared/config.yml"
-  - Verify it exists and contains `credentials-file:` pointing to a JSON under `$HOME/.cloudflared`.
-    grep -n "credentials-file" "$HOME/.cloudflared/config.yml" || true
+  - Verify it exists and contains the correct tunnel configuration:
+    cat "$HOME/.cloudflared/config.yml"
+  
+  Expected config for awen01.cc:
+    tunnel: de0f30f9-0b1f-4812-871f-039334db8833
+    credentials-file: /home/lanc3lot/.cloudflared/de0f30f9-0b1f-4812-871f-039334db8833.json
+    ingress:
+      - hostname: awen01.cc
+        service: http://localhost:8000
+      - hostname: www.awen01.cc
+        service: http://localhost:8000
+      - service: http_status:404
 
-- Check credentials and origin cert:
+- Check credentials file exists:
   - ls -l $HOME/.cloudflared/*.json
-  - test -f $HOME/.cloudflared/cert.pem && echo cert exists || echo cert missing
+  - Verify the tunnel ID matches the config
 
-- If credentials or cert are missing:
-  - Run interactive login on the host that should own the tunnel (requires CF account):
-    cloudflared login
-  - Create the tunnel (example):
-    cloudflared tunnel create fileshare
-  - Update $HOME/.cloudflared/config.yml with `credentials-file: /home/<user>/.cloudflared/<tunnel-id>.json` and routes (the `run_fileshare.sh` expects that file to be set).
+- If credentials or config are missing:
+  - Contact the tunnel owner or restore from backup
+  - The tunnel is already created and configured for awen01.cc
 
 3) Verify Python virtualenv and environment variables
 
 - Ensure project virtualenv exists and dependencies are installed:
-  - cd /home/bodhi/neo-druidic-society
+  - cd /home/lanc3lot/neo-druidic-society
   - test -f .venv/bin/activate || (python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt)
 
-- Ensure `.env` (project root) contains required runtime vars or that they are present in the environment. Important keys referenced in `app/config.py` and `run_fileshare.sh`:
-  - FLASK_APP, FLASK_RUN_PORT, NEO_DRUIDIC_MODEL_PATH, SOLANA_PRIVATE_KEY, SOLANA_RPC_URL, NEO_DRUIDIC_SECRET_KEY, etc.
+- Ensure `.env` (project root) contains required runtime vars. Important keys referenced in `app/config.py`:
+  - FLASK_APP=main.py
+  - NEO_DRUIDIC_DATABASE_URI (PostgreSQL connection string)
+  - NEO_DRUIDIC_SECRET_KEY
+  - SOLANA_PRIVATE_KEY (for NEOD token operations)
+  - SOLANA_WALLET_ADDRESS
+  - SOLANA_RPC_URL (e.g., Helius RPC)
+  - NEOD_MINT_ADDRESS
+  - NEO_DRUIDIC_MODEL_PATH (for AI features)
 
-- If you prefer not to store secrets in `.env`, export them in the environment before running.
+- Verify .env exists:
+  - test -f .env && echo "✅ .env exists" || echo "❌ .env missing"
 
-4) Start the application using the provided runner
+4) Start the application using the startup script
 
-- Use the repository script which performs checks and starts both Flask and the Cloudflare tunnel:
-  - cd /home/bodhi/neo-druidic-society
-  - Make executable if needed: chmod +x run_fileshare.sh
-  - Run it in a foreground session for monitoring: ./run_fileshare.sh
+**QUICK START (recommended):**
+  ```bash
+  cd /home/lanc3lot/neo-druidic-society
+  ./start_services.sh
+  ```
 
-- To run in background / supervised mode, use a terminal multiplexer or systemd unit (example systemd service provided below if you want to create it):
-  - Example systemd unit (create `/etc/systemd/system/fileshare.service`):
+This script will:
+- Kill any existing Flask/cloudflared processes
+- Start Flask on port 8000 (CRITICAL - must match Cloudflare tunnel config)
+- Start Cloudflare tunnel
+- Show you the PIDs and log locations
+
+**Manual start (if script fails):**
+  ```bash
+  cd /home/lanc3lot/neo-druidic-society
+  
+  # Start Flask on port 8000
+  nohup .venv/bin/python -m flask run --host=0.0.0.0 --port=8000 > logs/flask.log 2>&1 &
+  
+  # Start Cloudflare tunnel
+  nohup cloudflared tunnel run > logs/cloudflared.log 2>&1 &
+  ```
+
+**For persistent service (systemd):**
+  - Example systemd unit (create `/etc/systemd/system/neo-druidic.service`):
+    ```ini
     [Unit]
-    Description=Fileshare (Flask + cloudflared)
+    Description=Neo Druidic Society (Flask + cloudflared)
     After=network.target
 
     [Service]
-    User=bodhi
-    WorkingDirectory=/home/bodhi/neo-druidic-society
-    ExecStart=/home/bodhi/neo-druidic-society/run_fileshare.sh
+    User=lanc3lot
+    WorkingDirectory=/home/lanc3lot/neo-druidic-society
+    ExecStart=/home/lanc3lot/neo-druidic-society/start_services.sh
     Restart=on-failure
-    Environment=PATH=/home/bodhi/.local/bin:/home/bodhi/neo-druidic-society/.venv/bin:/usr/bin:/bin
+    Environment=PATH=/home/lanc3lot/.local/bin:/home/lanc3lot/neo-druidic-society/.venv/bin:/usr/bin:/bin
 
     [Install]
     WantedBy=multi-user.target
+    ```
 
-  - Then: sudo systemctl daemon-reload; sudo systemctl enable --now fileshare.service
+  - Then: 
+    ```bash
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now neo-druidic.service
+    ```
 
-5) Troubleshooting common errors
+5) Verify site is accessible
 
-- cloudflared fails with "credentials file not found" or config missing
-  - Ensure $HOME/.cloudflared/config.yml contains a valid `credentials-file:` path.
-  - Run `cloudflared login` and `cloudflared tunnel create fileshare` on the server and update config.
+After starting services, verify the site is live:
 
-- cloudflared logs show DNS/lookup errors (e.g., `lookup protocol-v2.argotunnel.com on 127.0.0.53:53: no such host`)
-  - Confirm the server's DNS resolver works: dig protocol-v2.argotunnel.com @1.1.1.1
-  - If DNS is blocked, fix resolver (e.g. edit /etc/resolv.conf or use systemd-resolved configuration). Restart cloudflared after resolver fix.
+```bash
+# Check local Flask
+curl -s http://localhost:8000/ | head -20
 
-- Flask process exits immediately or logs "This is a development server. Do not use it in production"
-  - The project uses `flask run` (development server). For production, run behind a WSGI server like gunicorn. To get it running quickly, ensure the virtualenv and dependencies are installed and re-run `./run_fileshare.sh`.
-  - Check `logs/application.log` and stdout from `./run_fileshare.sh` for Python tracebacks; fix missing modules or import errors.
+# Check through Cloudflare tunnel
+curl -s https://awen01.cc/ | head -20
+curl -s https://www.awen01.cc/ | head -20
+```
 
-- If the tunnel starts but site is unreachable from the internet
-  - Confirm Cloudflare DNS (the CNAME or route) is configured for the tunnel in Cloudflare dashboard or via `cloudflared route dns` configuration.
-  - Confirm `cloudflared tunnel list` shows the `fileshare` tunnel and that it is `RUNNING` (use `cloudflared tunnel info fileshare` on the host or check `cloudflared tunnel list` remotely).
+Expected: HTML response with "Neo Druidic Society" in the title.
 
-6) Verification checks after restart
+6) Troubleshooting common errors
 
-- Confirm Flask is listening locally:
-  - ss -ltnp | grep :8000
+**Port mismatch (CRITICAL):**
+- Flask MUST run on port 8000 (not 5000 or any other port)
+- Cloudflare tunnel config points to localhost:8000
+- Check: `ss -ltnp | grep :8000` should show Flask listening
+- Fix: Kill Flask and restart with `--port=8000`
 
-- Confirm cloudflared is running and attached to the tunnel:
-  - ps aux | grep cloudflared
-  - cloudflared tunnel list
+**cloudflared fails with "credentials file not found":**
+- Ensure $HOME/.cloudflared/config.yml contains correct credentials-file path
+- Verify: `cat ~/.cloudflared/config.yml`
+- The tunnel ID should be: de0f30f9-0b1f-4812-871f-039334db8833
 
-- Check the logs for a successful handshake and registered connections:
-  - tail -n 200 logs/fileshare_supervisor.log | grep "Registered tunnel connection" || true
+**cloudflared DNS/lookup errors:**
+- Confirm DNS resolver works: `dig protocol-v2.argotunnel.com @1.1.1.1`
+- If DNS is blocked, fix /etc/resolv.conf or systemd-resolved
+- Restart cloudflared after DNS fix
 
-7) If you cannot fix on the host
+**Flask exits immediately or import errors:**
+- Check logs: `tail -f logs/flask.log` and `logs/application.log`
+- Verify virtualenv: `source .venv/bin/activate && pip check`
+- Reinstall dependencies: `pip install -r requirements.txt`
+- Check .env file exists and has required variables
 
-- Alternative: spin up a replacement host with the same project and cloudflared credentials JSON copied to `$HOME/.cloudflared/` and the same `config.yml`, then run `./run_fileshare.sh` there. Keep credentials JSON private.
+**Site unreachable from internet (403 errors on NEOD endpoint):**
+- Verify Cloudflare WAF rule exists for `/api/v1/neod/purchase`
+- Go to Cloudflare Dashboard → Security → WAF → Custom rules
+- Should have rule: "Allow NEOD Purchase API" that skips security for that endpoint
+- Check Cloudflare → Security → Events for blocked requests
 
-Appendix — Suggested automation for AI handling (machine-readable checklist)
+**Tunnel starts but site shows 530 error:**
+- Flask is not running or not on port 8000
+- Check: `ps aux | grep flask` and `ss -ltnp | grep :8000`
+- Restart Flask on correct port: `./start_services.sh`
 
-- Step objects (JSON-like):
-  - {"id":1, "name":"check_processes", "cmds":["ps aux | grep -E '(cloudflared|flask)' | grep -v grep","tail -n 200 logs/fileshare_supervisor.log"]}
-  - {"id":2, "name":"verify_cloudflared", "cmds":["command -v cloudflared","test -f $HOME/.cloudflared/config.yml && echo ok || echo missing"]}
-  - {"id":3, "name":"verify_venv","cmds":["test -f .venv/bin/activate && echo ok || echo missing",". .venv/bin/activate && pip check || true"]}
-  - {"id":4, "name":"start_runner","cmds":["./run_fileshare.sh"]}
+7) Verification checks after restart
 
-Commit note: This file documents the known run script (`run_fileshare.sh`) and Cloudflare tunnel usage. It should be stored at project root as `ressurectionProtocol.md`.
+**Process checks:**
+```bash
+# Both should show running processes
+ps aux | grep -E "(cloudflared|flask)" | grep -v grep
+
+# Flask should be listening on port 8000
+ss -ltnp | grep :8000
+```
+
+**Log checks:**
+```bash
+# Check Flask startup
+tail -n 50 logs/flask.log
+
+# Check Cloudflare tunnel connection
+tail -n 50 logs/cloudflared.log | grep -i "registered\|connection"
+
+# Check application logs
+tail -n 50 logs/application.log
+```
+
+**Connectivity checks:**
+```bash
+# Local
+curl -s http://localhost:8000/ | grep -i "neo druidic"
+
+# Public (through Cloudflare)
+curl -s https://awen01.cc/ | grep -i "neo druidic"
+curl -s https://www.awen01.cc/ | grep -i "neo druidic"
+
+# NEOD API endpoint (should return JSON error, not 403)
+curl -X POST https://www.awen01.cc/api/v1/neod/purchase \
+  -H "Content-Type: application/json" \
+  -d '{"signature":"test","recipient":"11111111111111111111111111111111"}'
+```
+
+8) If you cannot fix on the host
+
+- Alternative: spin up a replacement host with the same project and cloudflared credentials
+- Copy `$HOME/.cloudflared/` directory (contains config.yml and credentials JSON)
+- Copy `.env` file with all secrets
+- Run `./start_services.sh`
+- Keep credentials JSON and .env private!
+
+---
+
+## Appendix — Quick Reference
+
+**Site URLs:**
+- Primary: https://awen01.cc
+- Alternate: https://www.awen01.cc
+
+**Critical Configuration:**
+- Flask port: 8000 (MUST match Cloudflare tunnel config)
+- Cloudflare tunnel ID: de0f30f9-0b1f-4812-871f-039334db8833
+- Project root: /home/lanc3lot/neo-druidic-society
+- User: lanc3lot
+
+**Key Files:**
+- Startup script: `./start_services.sh`
+- Cloudflare config: `~/.cloudflared/config.yml`
+- Environment vars: `.env`
+- Logs: `logs/flask.log`, `logs/cloudflared.log`, `logs/application.log`
+
+**One-Command Resurrection:**
+```bash
+cd /home/lanc3lot/neo-druidic-society && ./start_services.sh
+```
+
+**Suggested automation for AI handling (machine-readable checklist):**
+
+```json
+[
+  {"id":1, "name":"check_processes", "cmds":["ps aux | grep -E '(cloudflared|flask)' | grep -v grep","tail -n 50 logs/flask.log","tail -n 50 logs/cloudflared.log"]},
+  {"id":2, "name":"verify_cloudflared", "cmds":["command -v cloudflared","cat $HOME/.cloudflared/config.yml"]},
+  {"id":3, "name":"verify_venv","cmds":["test -f .venv/bin/activate && echo ok || echo missing","test -f .env && echo ok || echo missing"]},
+  {"id":4, "name":"start_services","cmds":["cd /home/lanc3lot/neo-druidic-society","./start_services.sh"]},
+  {"id":5, "name":"verify_site","cmds":["curl -s http://localhost:8000/ | head -20","curl -s https://awen01.cc/ | head -20"]}
+]
+```
+
+---
+
+**Last Updated:** October 19, 2025  
+**Tunnel:** awen01.cc (de0f30f9-0b1f-4812-871f-039334db8833)  
+**Status:** Active and tested after power loss recovery

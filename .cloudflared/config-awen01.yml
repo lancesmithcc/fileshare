@@ -1,0 +1,9 @@
+tunnel: awen01
+credentials-file: /home/lanc3lot/.cloudflared/awen01.json
+
+ingress:
+  - hostname: awen01.cc
+    service: http://localhost:8000
+  - hostname: www.awen01.cc
+    service: http://localhost:8000
+  - service: http_status:404

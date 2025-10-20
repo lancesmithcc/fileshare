@@ -195,3 +195,26 @@ def neod_info_legacy():
 @legacy_api_bp.route("/neod/purchase", methods=["POST"])
 def neod_purchase_legacy():
     return neod_purchase()
+
+
+@api_bp.route("/solana/rpc", methods=["POST"])
+def solana_rpc_proxy():
+    """Proxy Solana RPC requests to avoid CORS and 403 issues from browser."""
+    # No API key required for RPC proxy - it's used by the frontend
+    payload = request.get_json(silent=True) or {}
+    
+    # Always use the public fallback RPC for browser requests to avoid auth issues
+    rpc_url = "https://api.mainnet-beta.solana.com"
+    
+    try:
+        import requests
+        response = requests.post(
+            rpc_url,
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=30
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as exc:
+        logger.error("RPC proxy error: %s", exc)
+        return jsonify({"error": "RPC unavailable", "details": str(exc)}), 503

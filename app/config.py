@@ -134,6 +134,9 @@ class Config:
         "NEO_DRUIDIC_DATABASE_URI", f"sqlite:///{BASE_DIR / 'neo_druidic.db'}"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SECURE = False
+    SESSION_COOKIE_HTTPONLY = True
     AI_MODEL_PATH = _resolve_default_model_path()
     AI_CONTEXT_WINDOW = int(os.environ.get("NEO_DRUIDIC_CONTEXT", "2048"))
     AI_MODEL_REGISTRY = _load_model_registry()

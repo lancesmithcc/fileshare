@@ -302,6 +302,38 @@ def profile(username: str):
 @login_required
 def edit_profile():
     if request.method == "POST":
+        form_type = request.form.get("form_type", "profile")
+        
+        # Handle password change
+        if form_type == "password":
+            current_password = request.form.get("current_password", "")
+            new_password = request.form.get("new_password", "")
+            confirm_password = request.form.get("confirm_password", "")
+            
+            if not current_password or not new_password or not confirm_password:
+                flash("All password fields are required.", "warning")
+                return redirect(url_for("social.edit_profile"))
+            
+            if not current_user.check_password(current_password):
+                flash("Current password is incorrect.", "danger")
+                return redirect(url_for("social.edit_profile"))
+            
+            if new_password != confirm_password:
+                flash("New passwords do not match.", "warning")
+                return redirect(url_for("social.edit_profile"))
+            
+            if len(new_password) < 8:
+                flash("New password must be at least 8 characters long.", "warning")
+                return redirect(url_for("social.edit_profile"))
+            
+            from werkzeug.security import generate_password_hash
+            current_user.password_hash = generate_password_hash(new_password)
+            db.session.add(current_user)
+            db.session.commit()
+            flash("Your password has been updated successfully.", "success")
+            return redirect(url_for("social.edit_profile"))
+        
+        # Handle profile update
         bio = request.form.get("bio", "").strip()
         grove = request.form.get("grove", "").strip()
         profile_html = request.form.get("profile_html", "")

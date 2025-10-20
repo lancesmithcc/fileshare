@@ -628,7 +628,8 @@ img {
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
-  width: 100%;
+  width: 233px;
+  margin:0px auto;
   flex: 1;
 }
 
@@ -642,7 +643,8 @@ img {
   background: rgba(8, 12, 16, 0.96);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 28px 52px -30px rgba(0, 0, 0, 0.85);
-  width: 100%;
+
+  margin:0 auto;
 }
 
 .nav-links.is-open {
@@ -690,8 +692,8 @@ img {
 }
 
 .nav-links a {
-  margin-right: 0;
-  width: 100%;
+  width: 222px;
+  margin:0 auto;
   text-align: center;
   padding: 0.65rem;
   display: block;

@@ -8,3 +8,4 @@ requests>=2.31.0
 llama-cpp-python>=0.2.0
 solana>=0.25.0,<0.26.0
 base58>=2.1.0
+psycopg2-binary

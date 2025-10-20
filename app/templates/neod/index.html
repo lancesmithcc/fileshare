@@ -8,9 +8,9 @@
   data-price-sol="{{ '{:.8f}'.format(info.price_sol) if info else '' }}"
   data-price-lamports="{{ info.price_lamports if info else '' }}"
   data-tokens-per-purchase="{{ info.tokens_per_purchase if info else '' }}"
-  data-web3-src="{{ url_for('static', filename='js/vendor/solana-web3.min.js') }}"
-  data-default-rpc="https://api.mainnet-beta.solana.com"
-  data-rpc-url="{{ info.rpc_url if info else '' }}"
+  data-web3-src="https://unpkg.com/@solana/web3.js@1.87.6/lib/index.iife.min.js"
+  data-default-rpc="https://solana-mainnet.g.alchemy.com/v2/demo"
+  data-rpc-url="https://solana-mainnet.g.alchemy.com/v2/demo"
   data-purchase-url="{{ url_for('api.neod_purchase') }}"
 >
   <div class="neod-hero">
@@ -177,6 +177,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="{{ url_for('static', filename='js/vendor/solana-web3.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/neod.js') }}?v=20250310"></script>
+<script src="{{ url_for('static', filename='js/neod.js') }}?v=20251019r"></script>
 {% endblock %}

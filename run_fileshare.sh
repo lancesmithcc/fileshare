@@ -4,7 +4,7 @@ set -euo pipefail
 # Ensure PATH includes user-local bin so cloudflared is found.
 export PATH="$HOME/.local/bin:$PATH"
 
-PROJECT_ROOT="/home/bodhi/neo-druidic-society"
+PROJECT_ROOT="/home/lanc3lot/neo-druidic-society"
 
 if [[ ! -f "$PROJECT_ROOT/.venv/bin/activate" ]]; then
   echo "Virtualenv not found at $PROJECT_ROOT/.venv. Run 'python3 -m venv .venv' and reinstall requirements." >&2

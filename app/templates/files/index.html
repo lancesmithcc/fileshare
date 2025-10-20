@@ -8,7 +8,7 @@
       <span class="control-amber"></span>
       <span class="control-green"></span>
     </div>
-    <div class="toolbar-title">Shared Hollow</div>
+    <div class="toolbar-title">knowledge garden</div>
     <div class="toolbar-actions">
       <button type="button" class="toolbar-button" data-open-picker>Upload</button>
       <button type="button" class="toolbar-button" data-toggle-folder aria-expanded="false" aria-controls="folder-create-form">New Folder</button>
@@ -16,7 +16,7 @@
   </header>
   <div class="hollow-body">
     <nav class="hollow-breadcrumbs" aria-label="Folder breadcrumbs">
-      <a href="{{ url_for('files.index') }}" class="crumb{% if not current_folder %} is-current{% endif %}" data-folder-target="">Shared Hollow</a>
+      <a href="{{ url_for('files.index') }}" class="crumb{% if not current_folder %} is-current{% endif %}" data-folder-target="">knowledge garden</a>
       {% for crumb in breadcrumbs %}
       <span class="crumb-divider">›</span>
       {% if loop.last %}
