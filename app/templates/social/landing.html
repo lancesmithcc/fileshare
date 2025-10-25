@@ -1,29 +1,82 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="hero">
-  <h1>{{ site_settings.hero_title }}</h1>
-  <p>{{ site_settings.hero_subtitle }}</p>
-  <p class="hero-description">{{ site_settings.landing_description }}</p>
-  <div class="cta">
-    <a class="button" href="{{ url_for('auth.register') }}">Join the Circle</a>
-    <a class="ghost-button" href="{{ url_for('auth.login') }}">Sign In</a>
+<section class="landing-hero">
+  <div class="landing-hero-inner">
+    <h1>{{ site_settings.hero_title }}</h1>
+    <p class="landing-hero-subtitle">{{ site_settings.hero_subtitle }}</p>
+    <p class="landing-hero-description">{{ site_settings.landing_description }}</p>
+    <div class="landing-actions">
+      <a class="btn btn-primary" href="{{ url_for('auth.register') }}">Join the Circle</a>
+      <a class="btn btn-secondary" href="{{ url_for('auth.login') }}">Sign In</a>
+    </div>
+    <div class="landing-quick-links">
+      <a class="btn btn-outline btn-compact" href="{{ url_for('social.feed') }}">🌊 Stream</a>
+      <a class="btn btn-outline btn-compact" href="{{ url_for('chat.index') }}">🔐 Whispers</a>
+      <a class="btn btn-outline btn-compact" href="{{ url_for('files.index') }}">📁 Knowledge Garden</a>
+      <a class="btn btn-outline btn-compact" href="{{ url_for('social.circles') }}">☉ Circles</a>
+      <a class="btn btn-outline btn-compact" href="{{ url_for('neod.donate') }}">💎 NEOD Treasury</a>
+      <a class="btn btn-outline btn-compact" href="{{ url_for('ai.index') if site_settings.show_ai else url_for('social.feed') }}">🜂 Archdruid AI</a>
+    </div>
   </div>
+  <aside class="landing-hero-showcase">
+    <div class="showcase-card">
+      <h3>Live Ritual Feed</h3>
+      <ul>
+        <li>🕯️ Equinox reflections shared moments ago</li>
+        <li>🌿 Herb lore circle gathering tomorrow</li>
+        <li>💬 Whisper from Eldara in your inbox</li>
+      </ul>
+      <a class="showcase-link" href="{{ url_for('auth.register') }}">See what’s unfolding →</a>
+    </div>
+    <div class="showcase-card">
+      <h3>Encrypted Whispers</h3>
+      <p>Post-quantum secure chat with automatic key management. Invite Eldara for instant guidance.</p>
+      <a class="showcase-link" href="{{ url_for('chat.index') }}">Open the channel →</a>
+    </div>
+  </aside>
 </section>
-<section class="features">
-  <article>
-    <span class="glyph icon-trigram-heaven" aria-hidden="true"></span>
-    <h2>Gathering Stream</h2>
-    <p>Share rites, reflections, and seasonal stories with fellow druids.</p>
+
+<section class="landing-grid">
+  <article class="landing-card">
+    <h2>🌊 Gathering Stream</h2>
+    <p>Compose seasonal reflections, ceremony notes, and pastoral care updates for the whole society.</p>
+    <a href="{{ url_for('social.feed') }}" class="btn btn-link landing-card-link">Visit the Stream</a>
   </article>
-  <article>
-    <span class="glyph icon-trigram-water" aria-hidden="true"></span>
-    <h2>Living Circles</h2>
-    <p>Form circles for groves, study groups, and community service.</p>
+  <article class="landing-card">
+    <h2>🔐 Whispers</h2>
+    <p>Enjoy end-to-end encrypted messaging, small group councils, and instant replies from the Archdruid AI.</p>
+    <a href="{{ url_for('chat.index') }}" class="btn btn-link landing-card-link">Open Whispers</a>
   </article>
-  <article>
-    <span class="glyph icon-trigram-earth" aria-hidden="true"></span>
-    <h2>AI Archdruid</h2>
-    <p>Consult a local model for ritual inspiration and inclusive guidance.</p>
+  <article class="landing-card">
+    <h2>📁 Knowledge Garden</h2>
+    <p>Curate rites, songbooks, research, and lore with draggable folders and shared vaults.</p>
+    <a href="{{ url_for('files.index') }}" class="btn btn-link landing-card-link">Explore the Garden</a>
   </article>
+  <article class="landing-card">
+    <h2>☉ Living Circles</h2>
+    <p>Gather your grove, host study cohorts, or organize service projects with circle membership tools.</p>
+    <a href="{{ url_for('social.circles') }}" class="btn btn-link landing-card-link">Browse Circles</a>
+  </article>
+  <article class="landing-card">
+    <h2>🜂 Archdruid AI</h2>
+    <p>Consult Eldara locally for ritual outlines, inclusive blessings, and grounded advice.</p>
+    <a href="{{ url_for('ai.index') if site_settings.show_ai else url_for('social.feed') }}" class="btn btn-link landing-card-link">Seek Counsel</a>
+  </article>
+  <article class="landing-card">
+    <h2>💎 NEOD Treasury</h2>
+    <p>Support the community or redeem offerings through the NEOD Solana integration.</p>
+    <a href="{{ url_for('neod.donate') }}" class="btn btn-link landing-card-link">Visit Treasury</a>
+  </article>
+</section>
+
+<section class="landing-footer-callout">
+  <div class="landing-footer-inner">
+    <h2>Ready to light a new hearth?</h2>
+    <p>Every member brings a story, a rite, a song. Join the circle and share yours.</p>
+    <div class="landing-actions">
+      <a class="btn btn-primary" href="{{ url_for('auth.register') }}">Create an Account</a>
+      <a class="btn btn-secondary" href="{{ url_for('auth.login') }}">Sign Back In</a>
+    </div>
+  </div>
 </section>
 {% endblock %}

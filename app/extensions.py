@@ -1,10 +1,12 @@
 from flask_login import LoginManager
+from flask_sock import Sock
 
 from .database import db
 from .models import User
 
 login_manager = LoginManager()
 login_manager.login_view = "auth.login"
+sock = Sock()
 
 
 @login_manager.user_loader

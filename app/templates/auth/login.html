@@ -1,20 +1,29 @@
 {% extends "base.html" %}
+{% set body_class = "auth-login" %}
 {% block content %}
-<h1>Sign In</h1>
-<form method="post" class="card form">
-  <label>
-    Druid Name
-    <input type="text" name="username" required autofocus>
-  </label>
-  <label>
-    Passphrase
-    <input type="password" name="password" required>
-  </label>
-  <label class="checkbox">
-    <input type="checkbox" name="remember">
-    Remember me beside the sacred fire
-  </label>
-  <button type="submit" class="button">Enter</button>
-</form>
-<p>No credentials yet? <a href="{{ url_for('auth.register') }}">Join the circle.</a></p>
+<div class="auth-login-shell">
+  <div class="auth-login-card">
+    <img
+      src="{{ url_for('static', filename='img/triple.svg.png') }}"
+      alt="{{ site_settings.site_title }} emblem"
+      class="auth-login-logo"
+    >
+    <form method="post" class="auth-login-form">
+      <label>
+        <span class="auth-login-label">handle</span>
+        <input type="text" name="username" required autofocus>
+      </label>
+      <label>
+        <span class="auth-login-label">key</span>
+        <input type="password" name="password" required>
+      </label>
+      <label class="auth-login-remember">
+        <input type="checkbox" name="remember">
+        <span>remember</span>
+      </label>
+      <button type="submit" class="auth-login-submit">Enter</button>
+    </form>
+    <p class="auth-login-apply"><a href="{{ url_for('auth.register') }}">Apply for membership</a></p>
+  </div>
+</div>
 {% endblock %}

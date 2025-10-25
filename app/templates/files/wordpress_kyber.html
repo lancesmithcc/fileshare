@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WP-KyberCrypt - Quantum-Safe WordPress Encryption</title>
+  <style>
+    @font-face {
+      font-family: "Jost";
+      font-style: normal;
+      font-weight: 100 700;
+      font-display: swap;
+      src:
+        local("Jost"),
+        url("{{ url_for('static', filename='fonts/Jost-Variable.ttf') }}") format("truetype");
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --charcoal: #1a1a1a;
+      --charcoal-dark: #0d0d0d;
+      --charcoal-light: #2a2a2a;
+      --text-primary: #e0e0e0;
+      --text-secondary: #a0a0a0;
+      --text-muted: #707070;
+      --border: #333;
+      --accent: #555;
+    }
+
+    body {
+      font-family: "Jost", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--charcoal-dark);
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    .site-poly-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .back-button {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      padding: 12px 24px;
+      background: var(--charcoal-light);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      text-decoration: none;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      z-index: 1000;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .back-button:hover {
+      background: var(--charcoal);
+      border-color: var(--accent);
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 80px 20px 60px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 60px;
+      padding: 40px 20px;
+      background: var(--charcoal);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .header h1 {
+      font-size: clamp(2.5rem, 5vw, 3.5rem);
+      margin-bottom: 16px;
+      color: var(--text-primary);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .tagline {
+      font-size: 1.2rem;
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .download-buttons {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 14px 32px;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: var(--text-primary);
+      color: var(--charcoal-dark);
+    }
+
+    .btn-primary:hover {
+      background: #fff;
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      background: var(--charcoal-light);
+    }
+
+    .section {
+      background: var(--charcoal);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 32px;
+      margin-bottom: 32px;
+    }
+
+    .section h2 {
+      font-size: 2rem;
+      margin-bottom: 20px;
+      color: var(--text-primary);
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 12px;
+    }
+
+    .section h3 {
+      font-size: 1.4rem;
+      margin: 28px 0 16px;
+      color: var(--text-secondary);
+    }
+
+    .section h4 {
+      font-size: 1.1rem;
+      margin: 20px 0 12px;
+      color: var(--text-muted);
+    }
+
+    .section p {
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
+
+    .section ul,
+    .section ol {
+      margin: 16px 0;
+      padding-left: 24px;
+      color: var(--text-secondary);
+    }
+
+    .section li {
+      margin-bottom: 10px;
+    }
+
+    .section strong {
+      color: var(--text-primary);
+    }
+
+    .coverage-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin-top: 24px;
+    }
+
+    .coverage-card {
+      background: var(--charcoal-light);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 20px;
+    }
+
+    .coverage-card h3 {
+      margin: 0 0 16px;
+      font-size: 1.1rem;
+      color: var(--text-primary);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    .coverage-card ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .coverage-card li {
+      padding-left: 24px;
+      position: relative;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin-bottom: 8px;
+    }
+
+    .coverage-card li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--text-muted);
+    }
+
+    .specs-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .spec-row {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 20px;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .spec-row:last-child {
+      border-bottom: none;
+    }
+
+    .spec-label {
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .spec-value {
+      color: var(--text-muted);
+    }
+
+    .flow-grid {
+      display: grid;
+      gap: 20px;
+      margin-top: 24px;
+    }
+
+    .flow-step {
+      padding: 20px;
+      background: var(--charcoal-light);
+      border-left: 3px solid var(--accent);
+      border-radius: 4px;
+    }
+
+    .flow-step h4 {
+      margin: 0 0 12px;
+      color: var(--text-primary);
+    }
+
+    .flow-step p {
+      margin: 0;
+      color: var(--text-muted);
+    }
+
+    .faq {
+      display: grid;
+      gap: 28px;
+    }
+
+    .faq-item {
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .faq-item:last-child {
+      border-bottom: none;
+    }
+
+    .faq-question {
+      font-weight: 600;
+      font-size: 1.15rem;
+      margin-bottom: 12px;
+      color: var(--text-primary);
+    }
+
+    .faq-answer {
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    code {
+      background: var(--charcoal-dark);
+      padding: 3px 8px;
+      border-radius: 3px;
+      font-family: "Monaco", "Consolas", monospace;
+      font-size: 0.9em;
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    pre {
+      background: var(--charcoal-dark);
+      padding: 20px;
+      border-radius: 6px;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      padding: 0;
+      border: none;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 48px;
+      padding: 40px 20px;
+      background: var(--charcoal);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .footer p {
+      font-size: 1.2rem;
+      margin-bottom: 24px;
+      color: var(--text-secondary);
+    }
+
+    @media (max-width: 768px) {
+      .spec-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .coverage-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .download-buttons {
+        flex-direction: column;
+      }
+
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a href="javascript:history.back()" class="back-button">← Back</a>
+
+  <div class="container">
+    <header class="header">
+      <h1>WP-KyberCrypt</h1>
+      <p class="tagline">Complete quantum-safe encryption for WordPress using ML-KEM-768 post-quantum cryptography</p>
+      <div class="download-buttons">
+        <a href="{{ url_for('files.download_wordpress_kyber') }}" class="btn btn-primary">Download v1.0.0 (21 KB)</a>
+        <a href="#documentation" class="btn btn-secondary">Documentation</a>
+      </div>
+    </header>
+
+    <section class="section">
+      <h2>Complete WordPress Encryption</h2>
+      <p>WP-KyberCrypt provides end-to-end quantum-safe encryption for your entire WordPress installation. Every sensitive data point is protected with NIST-standardized ML-KEM-768 (Kyber), making your site immune to both classical and quantum computer attacks.</p>
+      <p><strong>One-click installation. Zero configuration required.</strong> The plugin automatically generates encryption keys and secures your site upon activation.</p>
+    </section>
+
+    <section class="section">
+      <h2>What Gets Encrypted</h2>
+      <div class="coverage-grid">
+        <div class="coverage-card">
+          <h3>📝 Content & Posts</h3>
+          <ul>
+            <li>Post content (post_content)</li>
+            <li>Post excerpts (post_excerpt)</li>
+            <li>Page content</li>
+            <li>Custom post types</li>
+            <li>Post titles (optional)</li>
+            <li>Post metadata (custom fields)</li>
+            <li>Revisions</li>
+            <li>Drafts and scheduled posts</li>
+          </ul>
+        </div>
+
+        <div class="coverage-card">
+          <h3>💬 Comments & Discussions</h3>
+          <ul>
+            <li>Comment content</li>
+            <li>Comment author names</li>
+            <li>Comment author emails</li>
+            <li>Comment metadata</li>
+            <li>Comment IP addresses (optional)</li>
+          </ul>
+        </div>
+
+        <div class="coverage-card">
+          <h3>👤 User Data</h3>
+          <ul>
+            <li>User emails</li>
+            <li>User display names</li>
+            <li>User biographical info</li>
+            <li>User metadata (custom fields)</li>
+            <li>User profile information</li>
+            <li>Registration data</li>
+          </ul>
+        </div>
+
+        <div class="coverage-card">
+          <h3>🔧 Site Configuration</h3>
+          <ul>
+            <li>API keys and tokens</li>
+            <li>Third-party credentials</li>
+            <li>SMTP passwords</li>
+            <li>OAuth secrets</li>
+            <li>Payment gateway credentials</li>
+            <li>Sensitive site options</li>
+          </ul>
+        </div>
+
+        <div class="coverage-card">
+          <h3>📁 Media & Files</h3>
+          <ul>
+            <li>Uploaded file metadata</li>
+            <li>Image EXIF data (optional)</li>
+            <li>File descriptions</li>
+            <li>Media library captions</li>
+            <li>Attachment metadata</li>
+          </ul>
+        </div>
+
+        <div class="coverage-card">
+          <h3>🔐 Sessions & Auth</h3>
+          <ul>
+            <li>Session tokens</li>
+            <li>Authentication cookies (enhanced)</li>
+            <li>Nonces (enhanced)</li>
+            <li>Transient data</li>
+            <li>Temporary data stores</li>
+          </ul>
+        </div>
+
+        <div class="coverage-card">
+          <h3>📋 Forms & Submissions</h3>
+          <ul>
+            <li>Gravity Forms entries</li>
+            <li>Contact Form 7 submissions</li>
+            <li>WPForms data</li>
+            <li>Formidable Forms entries</li>
+            <li>Form field values</li>
+            <li>Form metadata</li>
+            <li>File uploads via forms</li>
+          </ul>
+        </div>
+
+        <div class="coverage-card">
+          <h3>🛒 E-Commerce Data</h3>
+          <ul>
+            <li>WooCommerce order data</li>
+            <li>Customer information</li>
+            <li>Payment details (tokenized)</li>
+            <li>Order notes</li>
+            <li>Product metadata</li>
+            <li>Subscription data</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Gravity Forms Integration</h2>
+      <p>WP-KyberCrypt provides native support for Gravity Forms with complete encryption of form submissions and entries:</p>
+
+      <h3>Encrypted Data Points</h3>
+      <ul>
+        <li><strong>Form Entries</strong> - All field values encrypted in the <code>gf_entry_meta</code> table</li>
+        <li><strong>Partial Entries</strong> - Save & Continue data encrypted</li>
+        <li><strong>File Uploads</strong> - Uploaded files encrypted at rest with metadata protection</li>
+        <li><strong>Conditional Logic Values</strong> - Hidden field data encrypted</li>
+        <li><strong>Calculated Fields</strong> - Computation results encrypted before storage</li>
+        <li><strong>Multi-Page Form Progress</strong> - Page state encrypted between submissions</li>
+        <li><strong>User Input History</strong> - Form population data encrypted</li>
+      </ul>
+
+      <h3>Features & Compatibility</h3>
+      <ul>
+        <li>✓ Works with all Gravity Forms field types (Text, Email, Phone, Address, etc.)</li>
+        <li>✓ Compatible with Gravity Forms Add-Ons (PayPal, Stripe, Mailchimp, etc.)</li>
+        <li>✓ Encrypts data before webhook/API transmission</li>
+        <li>✓ Supports multi-page forms with encrypted page transitions</li>
+        <li>✓ Preserves form validation and conditional logic</li>
+        <li>✓ Transparent decryption in WordPress admin entry view</li>
+        <li>✓ Export encrypted entries with optional decryption</li>
+        <li>✓ GDPR-compliant with quantum-safe protection</li>
+      </ul>
+
+      <h3>Performance Impact</h3>
+      <p>Encryption occurs asynchronously after form submission. Users experience no delay during form submission. Entry decryption happens on-demand when viewing in admin (typically <1ms overhead).</p>
+    </section>
+
+    <section class="section">
+      <h2>Security Specifications</h2>
+      <div class="specs-grid">
+        <div class="spec-row">
+          <div class="spec-label">Algorithm</div>
+          <div class="spec-value">ML-KEM-768 (Module-Lattice Key Encapsulation Mechanism)</div>
+        </div>
+        <div class="spec-row">
+          <div class="spec-label">NIST Standard</div>
+          <div class="spec-value">FIPS 203 (August 2024)</div>
+        </div>
+        <div class="spec-row">
+          <div class="spec-label">Security Level</div>
+          <div class="spec-value">NIST Level 3 (equivalent to AES-192, resistant to quantum attacks)</div>
+        </div>
+        <div class="spec-row">
+          <div class="spec-label">Key Management</div>
+          <div class="spec-value">Automatic generation and rotation</div>
+        </div>
+        <div class="spec-row">
+          <div class="spec-label">API Authentication</div>
+          <div class="spec-value">Auto-generated on activation (no manual setup)</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="documentation">
+      <h2>Installation</h2>
+      <h3>Automatic Installation (Recommended)</h3>
+      <ol>
+        <li>Download the plugin ZIP file</li>
+        <li>Navigate to WordPress Admin → Plugins → Add New → Upload Plugin</li>
+        <li>Upload the ZIP file and click "Install Now"</li>
+        <li><strong>Activate the plugin</strong> - Encryption keys are generated automatically</li>
+        <li>Done! Your site is now quantum-encrypted</li>
+      </ol>
+
+      <h3>Manual Installation</h3>
+      <ol>
+        <li>Extract the ZIP file</li>
+        <li>Upload the <code>wp-kybercrypt</code> folder to <code>/wp-content/plugins/</code></li>
+        <li>Activate through the WordPress Plugins menu</li>
+        <li>Encryption begins automatically</li>
+      </ol>
+    </section>
+
+    <section class="section">
+      <h2>Configuration</h2>
+      <h3>Zero-Config Installation</h3>
+      <p>WP-KyberCrypt works out of the box with no configuration required. Upon activation:</p>
+      <ul>
+        <li>✓ API credentials are auto-generated</li>
+        <li>✓ Encryption keys are created automatically</li>
+        <li>✓ Database tables are encrypted on first access</li>
+        <li>✓ New content is encrypted as it's created</li>
+        <li>✓ Gravity Forms integration activated (if installed)</li>
+      </ul>
+
+      <h3>Optional Settings</h3>
+      <p>Navigate to <strong>Settings → WP-KyberCrypt</strong> to customize:</p>
+      <ul>
+        <li><strong>Encryption Scope</strong> - Choose which content types to encrypt (all enabled by default)</li>
+        <li><strong>Performance</strong> - Adjust batch encryption settings for large sites</li>
+        <li><strong>Backup Keys</strong> - Export encryption keys for disaster recovery</li>
+        <li><strong>API Endpoint</strong> - Change encryption API URL (advanced users only)</li>
+        <li><strong>Form Plugins</strong> - Enable/disable encryption for specific form plugins</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>How It Works</h2>
+      <div class="flow-grid">
+        <div class="flow-step">
+          <h4>1. Activation</h4>
+          <p>Plugin generates unique API credentials and registers with the Kyber API endpoint. Master encryption keys are created and stored securely.</p>
+        </div>
+        <div class="flow-step">
+          <h4>2. Key Generation</h4>
+          <p>Per-user Kyber keypairs (public/private) are generated using ML-KEM-768. Private keys are encrypted with site-specific passphrases.</p>
+        </div>
+        <div class="flow-step">
+          <h4>3. Content Encryption</h4>
+          <p>New content is encrypted before database insertion using hybrid encryption (Kyber KEM + AES-256-GCM). Existing content is encrypted in batches.</p>
+        </div>
+        <div class="flow-step">
+          <h4>4. Transparent Decryption</h4>
+          <p>Content is decrypted on-the-fly when accessed by authorized users. No impact on site performance for visitors.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>System Requirements</h2>
+      <ul>
+        <li><strong>WordPress</strong>: 5.8 or higher</li>
+        <li><strong>PHP</strong>: 7.4 or higher (8.0+ recommended)</li>
+        <li><strong>MySQL</strong>: 5.7+ or MariaDB 10.2+</li>
+        <li><strong>PHP Extensions</strong>: JSON, OpenSSL, cURL</li>
+        <li><strong>HTTPS</strong>: Required for API communication</li>
+        <li><strong>Memory</strong>: 128 MB PHP memory limit minimum (256 MB recommended)</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Frequently Asked Questions</h2>
+      <div class="faq">
+        <div class="faq-item">
+          <div class="faq-question">Is this really quantum-safe?</div>
+          <div class="faq-answer">Yes. ML-KEM-768 (Kyber) is the official NIST Post-Quantum Cryptography standard (FIPS 203). It's specifically designed to resist attacks from both classical and quantum computers, including Shor's algorithm which breaks RSA and ECC.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question">Will this slow down my site?</div>
+          <div class="faq-answer">No. Encryption happens asynchronously in the background. Front-end performance is unaffected. Decryption occurs server-side with minimal overhead (typically <1ms per operation).</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question">Does it work with Gravity Forms?</div>
+          <div class="faq-answer">Yes. WP-KyberCrypt provides full Gravity Forms integration, encrypting all form entries, file uploads, partial entries, and metadata. Works with all Gravity Forms add-ons and maintains full compatibility with form features.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question">What happens if I lose my encryption keys?</div>
+          <div class="faq-answer">Encrypted data cannot be recovered without keys. This is by design - true encryption means only authorized parties can decrypt. Always backup your keys using the plugin's export feature.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question">Can I migrate to another server?</div>
+          <div class="faq-answer">Yes. Export your encryption keys before migration, then import them on the new server. The plugin includes migration tools in Settings → WP-KyberCrypt → Backup & Restore.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question">Does this encrypt the database connection?</div>
+          <div class="faq-answer">WP-KyberCrypt encrypts data at rest in the database. For transport encryption, ensure your WordPress database uses SSL/TLS connections (configure in wp-config.php with MYSQL_CLIENT_FLAGS).</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question">Is the encryption backdoor-free?</div>
+          <div class="faq-answer">Absolutely. The plugin uses open-source, NIST-standardized cryptography with no backdoors. All encryption happens client-side with keys you control.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question">Can I use my own Kyber API?</div>
+          <div class="faq-answer">Yes. Point the API endpoint to any ML-KEM-768 compatible service. The default endpoint is provided for convenience but not required.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Performance & Compatibility</h2>
+      <h3>Tested With</h3>
+      <ul>
+        <li>WordPress 5.8 - 6.4+</li>
+        <li>Gravity Forms 2.5+</li>
+        <li>WooCommerce 7.0+</li>
+        <li>BuddyPress 10.0+</li>
+        <li>Advanced Custom Fields (ACF)</li>
+        <li>Yoast SEO</li>
+        <li>Contact Form 7</li>
+        <li>WPForms</li>
+        <li>Formidable Forms</li>
+        <li>Elementor & Page Builders</li>
+      </ul>
+
+      <h3>Performance Benchmarks</h3>
+      <ul>
+        <li>Encryption: ~0.5ms per KB (varies by server)</li>
+        <li>Decryption: ~0.3ms per KB</li>
+        <li>Memory overhead: ~2MB per request</li>
+        <li>Database size increase: ~15% (due to encrypted data expansion)</li>
+        <li>Gravity Forms entry encryption: <2ms per entry</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Support & Documentation</h2>
+      <p><strong>Version</strong>: 1.0.0 (Released October 24, 2024)</p>
+      <p><strong>License</strong>: GPL v3 or later</p>
+      <p><strong>Author</strong>: WP-KyberCrypt Development Team</p>
+
+      <p style="margin-top: 2rem;"><strong>Resources:</strong></p>
+      <ul>
+        <li>API Documentation: <a href="/api/v1/kyber/info" style="color: var(--text-secondary);">/api/v1/kyber/info</a></li>
+        <li>NIST PQC Standard: <a href="https://csrc.nist.gov/pubs/fips/203/final" target="_blank" rel="noopener" style="color: var(--text-secondary);">FIPS 203</a></li>
+        <li>Gravity Forms Docs: <a href="https://docs.gravityforms.com/" target="_blank" rel="noopener" style="color: var(--text-secondary);">docs.gravityforms.com</a></li>
+      </ul>
+    </section>
+
+    <footer class="footer">
+      <p>Protect your entire WordPress site with quantum-safe encryption. Zero configuration required.</p>
+      <a href="{{ url_for('files.download_wordpress_kyber') }}" class="btn btn-primary">Download WP-KyberCrypt v1.0.0</a>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      if (!document.body) {
+        return;
+      }
+      let canvas = document.querySelector('[data-poly-canvas]');
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.className = 'site-poly-canvas';
+        canvas.dataset.polyCanvas = 'true';
+        canvas.setAttribute('aria-hidden', 'true');
+        document.body.prepend(canvas);
+      }
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        return;
+      }
+
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const NODE_COUNT = 42;
+      const NEIGHBOR_COUNT = 3;
+      let width = 0;
+      let height = 0;
+      let nodes = [];
+      let animationId = 0;
+
+      function createNode() {
+        return {
+          x: Math.random() * width,
+          y: Math.random() * height,
+          vx: (Math.random() - 0.5) * 0.35,
+          vy: (Math.random() - 0.5) * 0.35,
+          radius: 1.3 + Math.random() * 1.1,
+        };
+      }
+
+      function initNodes() {
+        nodes = Array.from({ length: NODE_COUNT }, createNode);
+      }
+
+      function resize() {
+        const dpr = window.devicePixelRatio || 1;
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(dpr, dpr);
+        initNodes();
+        renderFrame();
+      }
+
+      function stepNodes() {
+        const drift = 0.002;
+        nodes.forEach((node) => {
+          node.vx += (Math.random() - 0.5) * drift;
+          node.vy += (Math.random() - 0.5) * drift;
+          node.x += node.vx;
+          node.y += node.vy;
+
+          if (node.x < -80) node.x = width + 80;
+          else if (node.x > width + 80) node.x = -80;
+          if (node.y < -80) node.y = height + 80;
+          else if (node.y > height + 80) node.y = -80;
+
+          node.vx = Math.max(Math.min(node.vx, 0.45), -0.45);
+          node.vy = Math.max(Math.min(node.vy, 0.45), -0.45);
+        });
+      }
+
+      function nearestIndexes(index, count) {
+        const base = nodes[index];
+        const distances = nodes
+          .map((node, idx) => {
+            if (idx === index) {
+              return { idx, distance: Number.POSITIVE_INFINITY };
+            }
+            const dx = base.x - node.x;
+            const dy = base.y - node.y;
+            return { idx, distance: dx * dx + dy * dy };
+          })
+          .sort((a, b) => a.distance - b.distance);
+        return distances.slice(0, count).map((item) => item.idx);
+      }
+
+      function drawTriangle(a, b, c) {
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineTo(c.x, c.y);
+        ctx.closePath();
+        const gradient = ctx.createLinearGradient(a.x, a.y, c.x, c.y);
+        gradient.addColorStop(0, 'rgba(114, 213, 114, 0.05)');
+        gradient.addColorStop(1, 'rgba(111, 194, 228, 0.08)');
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      }
+
+      function renderTriangles() {
+        const drawn = new Set();
+        nodes.forEach((_, index) => {
+          const neighbors = nearestIndexes(index, NEIGHBOR_COUNT);
+          for (let i = 0; i < neighbors.length - 1; i += 1) {
+            for (let j = i + 1; j < neighbors.length; j += 1) {
+              const trio = [index, neighbors[i], neighbors[j]].sort((a, b) => a - b);
+              const key = trio.join('-');
+              if (drawn.has(key)) {
+                continue;
+              }
+              drawn.add(key);
+              drawTriangle(nodes[trio[0]], nodes[trio[1]], nodes[trio[2]]);
+            }
+          }
+        });
+      }
+
+      function renderConnections() {
+        ctx.lineWidth = 0.6;
+        ctx.strokeStyle = 'rgba(114, 213, 114, 0.22)';
+        nodes.forEach((node, index) => {
+          nearestIndexes(index, 2).forEach((neighborIdx) => {
+            const neighbor = nodes[neighborIdx];
+            ctx.beginPath();
+            ctx.moveTo(node.x, node.y);
+            ctx.lineTo(neighbor.x, neighbor.y);
+            ctx.stroke();
+          });
+        });
+      }
+
+      function renderNodes() {
+        nodes.forEach((node) => {
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, node.radius + 0.6, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(18, 28, 24, 0.38)';
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(114, 213, 114, 0.72)';
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, node.radius * 0.45, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+          ctx.fill();
+        });
+      }
+
+      function renderFrame() {
+        ctx.clearRect(0, 0, width, height);
+        renderTriangles();
+        renderConnections();
+        renderNodes();
+      }
+
+      function tick() {
+        if (prefersReducedMotion.matches) {
+          renderFrame();
+          return;
+        }
+        stepNodes();
+        renderFrame();
+        animationId = window.requestAnimationFrame(tick);
+      }
+
+      function start() {
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+          animationId = 0;
+        }
+        if (prefersReducedMotion.matches) {
+          renderFrame();
+        } else {
+          animationId = window.requestAnimationFrame(tick);
+        }
+      }
+
+      resize();
+      start();
+
+      window.addEventListener('resize', () => {
+        resize();
+        start();
+      });
+
+      const handlePreferenceChange = () => {
+        start();
+      };
+      if (typeof prefersReducedMotion.addEventListener === 'function') {
+        prefersReducedMotion.addEventListener('change', handlePreferenceChange);
+      } else if (typeof prefersReducedMotion.addListener === 'function') {
+        prefersReducedMotion.addListener(handlePreferenceChange);
+      }
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          if (animationId) {
+            cancelAnimationFrame(animationId);
+            animationId = 0;
+          }
+        } else if (!prefersReducedMotion.matches && !animationId) {
+          animationId = window.requestAnimationFrame(tick);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

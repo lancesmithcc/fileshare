@@ -194,3 +194,4 @@ class Config:
     _neod_mint = os.environ.get("NEOD_MINT_ADDRESS")
     if _neod_mint:
         NEOD_MINT_ADDRESS = _neod_mint
+    GIPHY_API_KEY = os.environ.get("GIPHY_API_KEY")

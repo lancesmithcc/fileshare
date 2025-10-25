@@ -1,12 +1,4 @@
 (() => {
-  // Polyfill for Buffer (required by Solana web3.js in browser)
-  if (typeof window !== "undefined" && typeof window.Buffer === "undefined") {
-    window.Buffer = window.Buffer || {
-      from: (data) => new Uint8Array(data),
-      isBuffer: () => false,
-    };
-  }
-
   const LAMPORTS_PER_SOL = 1_000_000_000;
 
   const ready = () => {
@@ -38,12 +30,23 @@
     const treasury = root.dataset.treasury || "";
     const rpcUrl = root.dataset.rpcUrl || "https://api.mainnet-beta.solana.com";
     const fallbackRpc = root.dataset.defaultRpc || "https://api.mainnet-beta.solana.com";
+    const proxyRpc = root.dataset.rpcProxy || "";
+    const bufferSrc = root.dataset.bufferSrc || "";
+    const blockhashUrl = root.dataset.blockhashUrl || "/api/v1/neod/blockhash";
     const minSol = Number.parseFloat(root.dataset.priceSol || "0");
     const minLamports = Number.parseInt(root.dataset.priceLamports || "0", 10);
     const tokensPerPurchase = Number.parseInt(root.dataset.tokensPerPurchase || "1", 10) || 1;
     const purchaseUrl = root.dataset.purchaseUrl || "/api/v1/neod/purchase";
 
     let web3Promise = null;
+    let bufferPromise = null;
+    const candidateRpcEndpoints = Array.from(
+      new Set(
+        [rpcUrl, proxyRpc, fallbackRpc, "https://api.mainnet-beta.solana.com"].filter(
+          (value) => typeof value === "string" && value.length > 0
+        )
+      )
+    );
 
     const setStatus = (message, tone = "muted") => {
       if (!statusEl) {
@@ -79,6 +82,196 @@
       return Math.round(amountSol * LAMPORTS_PER_SOL);
     };
 
+    const hasBuffer = () =>
+      typeof window !== "undefined" &&
+      window.Buffer &&
+      typeof window.Buffer.from === "function" &&
+      typeof window.Buffer.alloc === "function" &&
+      typeof window.Buffer.isBuffer === "function";
+
+    const promoteBuffer = () => {
+      if (typeof window === "undefined") {
+        return false;
+      }
+      if (hasBuffer()) {
+        return true;
+      }
+      if (window.buffer && window.buffer.Buffer) {
+        window.Buffer = window.buffer.Buffer;
+        return hasBuffer();
+      }
+      return false;
+    };
+
+    const loadScript = (src, marker) =>
+      new Promise((resolve, reject) => {
+        if (!src) {
+          reject(new Error(`Missing ${marker || "script"} src`));
+          return;
+        }
+        const selector = marker ? `script[data-${marker}]` : `script[src="${src}"]`;
+        const existing = document.querySelector(selector);
+        if (existing) {
+          existing.addEventListener("load", resolve, { once: true });
+          existing.addEventListener("error", () => reject(new Error(`${marker || "script"} failed to load`)), {
+            once: true,
+          });
+          return;
+        }
+        const script = document.createElement("script");
+        script.src = src;
+        script.async = true;
+        script.crossOrigin = "anonymous";
+        if (marker) {
+          script.dataset[marker] = "1";
+        }
+        script.onload = resolve;
+        script.onerror = () => reject(new Error(`${marker || "script"} failed to load`));
+        document.head.appendChild(script);
+      });
+
+    const ensureBuffer = () => {
+      if (promoteBuffer()) {
+        return Promise.resolve(window.Buffer);
+      }
+      if (typeof window === "undefined") {
+        return Promise.resolve(null);
+      }
+      if (bufferPromise) {
+        return bufferPromise;
+      }
+      bufferPromise = loadScript(bufferSrc, "bufferPolyfill")
+        .then(() => {
+          if (!promoteBuffer()) {
+            throw new Error("Buffer polyfill loaded without Buffer global.");
+          }
+          return window.Buffer;
+        })
+        .catch((error) => {
+          console.error("[NEOD] Buffer polyfill failed", error);
+          bufferPromise = null;
+          throw error;
+        });
+      return bufferPromise;
+    };
+
+    const fetchBlockhashViaBackend = async () => {
+      if (!blockhashUrl) {
+        return null;
+      }
+      try {
+        const response = await fetch(blockhashUrl, {
+          method: "GET",
+          credentials: "same-origin",
+          headers: {
+            "Accept": "application/json",
+          },
+        });
+        if (!response.ok) {
+          const text = await response.text().catch(() => "");
+          throw new Error(`Blockhash API ${response.status} ${text || response.statusText || ""}`.trim());
+        }
+        const payload = await response.json();
+        if (payload && typeof payload.blockhash === "string" && payload.blockhash.length > 0) {
+          return {
+            blockhash: payload.blockhash,
+            lastValidBlockHeight:
+              typeof payload.last_valid_block_height === "number"
+                ? payload.last_valid_block_height
+                : null,
+          };
+        }
+        const warning = payload?.error || "Unexpected response from blockhash API.";
+        throw new Error(String(warning));
+      } catch (error) {
+        console.warn("[NEOD] Blockhash backend fetch failed", error);
+        return null;
+      }
+    };
+
+    const requestJsonRpc = async (endpoint, body) => {
+      const payload = JSON.stringify(body);
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "same-origin",
+        body: payload,
+      });
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        throw new Error(`RPC ${response.status} ${text || response.statusText || ""}`.trim());
+      }
+      return response.json();
+    };
+
+    const fetchLatestBlockhash = async () => {
+      const backendBlockhash = await fetchBlockhashViaBackend();
+      if (backendBlockhash) {
+        return backendBlockhash;
+      }
+
+      const primaryRequest = {
+        jsonrpc: "2.0",
+        id: "neod-blockhash",
+        method: "getLatestBlockhash",
+        params: [{ commitment: "confirmed" }],
+      };
+      for (const endpoint of candidateRpcEndpoints) {
+        try {
+          const result = await requestJsonRpc(endpoint, primaryRequest);
+          const value = result?.result?.value || result?.result;
+          const blockhash = value?.blockhash;
+          if (typeof blockhash === "string" && blockhash.length > 0) {
+            return {
+              blockhash,
+              lastValidBlockHeight:
+                typeof value?.lastValidBlockHeight === "number"
+                  ? value.lastValidBlockHeight
+                  : null,
+              endpoint,
+            };
+          }
+          console.warn("[NEOD] Missing blockhash in getLatestBlockhash response", {
+            endpoint,
+            result,
+          });
+        } catch (error) {
+          console.warn("[NEOD] getLatestBlockhash failed", endpoint, error);
+        }
+      }
+
+      const fallbackRequest = {
+        jsonrpc: "2.0",
+        id: "neod-recent-blockhash",
+        method: "getRecentBlockhash",
+        params: [{ commitment: "confirmed" }],
+      };
+      for (const endpoint of candidateRpcEndpoints) {
+        try {
+          const result = await requestJsonRpc(endpoint, fallbackRequest);
+          const value = result?.result?.value || result?.result;
+          const blockhash = value?.blockhash;
+          if (typeof blockhash === "string" && blockhash.length > 0) {
+            return {
+              blockhash,
+              lastValidBlockHeight: null,
+              endpoint,
+            };
+          }
+          console.warn("[NEOD] Missing blockhash in getRecentBlockhash response", {
+            endpoint,
+            result,
+          });
+        } catch (error) {
+          console.warn("[NEOD] getRecentBlockhash failed", endpoint, error);
+        }
+      }
+
+      throw new Error("Unable to fetch a recent blockhash. Please try again shortly.");
+    };
+
     const ensureWeb3 = () => {
       if (typeof window.solanaWeb3 === "object" && window.solanaWeb3.SystemProgram) {
         return Promise.resolve(window.solanaWeb3);
@@ -87,21 +280,26 @@
         return web3Promise;
       }
       const src = root.dataset.web3Src || "https://unpkg.com/@solana/web3.js@1.87.6/lib/index.iife.min.js";
-      web3Promise = new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src = src;
-        script.async = true;
-        script.crossOrigin = "anonymous";
-        script.onload = () => {
-          if (typeof window.solanaWeb3 === "object" && window.solanaWeb3.SystemProgram) {
-            resolve(window.solanaWeb3);
-          } else {
-            reject(new Error("Solana web3 library initialised without expected exports."));
-          }
-        };
-        script.onerror = () => reject(new Error("Unable to download the Solana web3 library."));
-        document.head.appendChild(script);
-      }).catch((error) => {
+      web3Promise = ensureBuffer()
+        .then(() =>
+          new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = src;
+            script.async = true;
+            script.crossOrigin = "anonymous";
+            script.onload = () => {
+              if (typeof window.solanaWeb3 === "object" && window.solanaWeb3.SystemProgram) {
+                resolve(window.solanaWeb3);
+              } else {
+                reject(new Error("Solana web3 library initialised without expected exports."));
+              }
+            };
+            script.onerror = () => reject(new Error("Unable to download the Solana web3 library."));
+            document.head.appendChild(script);
+          })
+        )
+        .catch((error) => {
+          console.error("[NEOD] Failed to initialise Solana web3", error);
         web3Promise = null;
         throw error;
       });
@@ -196,32 +394,29 @@
         sendButton.disabled = true;
         sendButton.dataset.loading = "1";
         setStatus(`Preparing ${formatSol(amountSol)} SOL transfer...`, "muted");
-
+        
         // Ensure lamports is a safe integer
         const lamportsInt = Math.floor(lamports);
         
         // Load web3 library
         const web3 = await ensureWeb3();
         
-        setStatus(`Creating transaction...`, "muted");
-        
-        // Get connection for recent blockhash
-        const connection = new web3.Connection(
-          rpcUrl || "https://api.mainnet-beta.solana.com",
-          "confirmed"
-        );
-        
+        setStatus(`Fetching recent blockhash...`, "muted");
+
         const fromPubkey = new web3.PublicKey(owner);
         const toPubkey = new web3.PublicKey(treasury);
-        
-        // Get recent blockhash
-        const { blockhash } = await connection.getLatestBlockhash("confirmed");
-        
-        // Create transaction using Transaction class
-        const transaction = new web3.Transaction({
+
+        const { blockhash, lastValidBlockHeight } = await fetchLatestBlockhash();
+        setStatus(`Creating transaction...`, "muted");
+
+        const transactionConfig = {
           recentBlockhash: blockhash,
           feePayer: fromPubkey,
-        });
+        };
+        const transaction = new web3.Transaction(transactionConfig);
+        if (typeof lastValidBlockHeight === "number" && Number.isFinite(lastValidBlockHeight)) {
+          transaction.lastValidBlockHeight = lastValidBlockHeight;
+        }
         
         // Add transfer instruction using SystemProgram
         transaction.add(
@@ -268,6 +463,7 @@
           "success",
         );
       } catch (error) {
+        console.error("[NEOD] Transaction initiation failed", error);
         const message =
           error && typeof error === "object" && "message" in error
             ? error.message

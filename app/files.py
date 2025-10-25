@@ -120,8 +120,9 @@ def _folder_options(exclude: Optional[FileFolder] = None) -> List[Tuple[str, str
         for child in folder.children:
             visit(child, child_prefix)
 
+    # Communal storage: show all root folders regardless of owner
     roots = (
-        FileFolder.query.filter_by(owner_id=current_user.id, parent_id=None)
+        FileFolder.query.filter_by(parent_id=None)
         .order_by(FileFolder.name.asc())
         .all()
     )
@@ -133,9 +134,8 @@ def _folder_options(exclude: Optional[FileFolder] = None) -> List[Tuple[str, str
 def _resolve_folder(folder_id: Optional[int]) -> Optional[FileFolder]:
     if not folder_id:
         return None
-    return FileFolder.query.filter_by(
-        id=folder_id, owner_id=current_user.id
-    ).first_or_404()
+    # Communal storage: allow access to any folder regardless of owner
+    return FileFolder.query.filter_by(id=folder_id).first_or_404()
 
 
 def _current_folder_id() -> Optional[int]:
@@ -149,16 +149,17 @@ def index():
     folder_id = request.args.get("folder", type=int)
     current_folder = _resolve_folder(folder_id)
 
+    # Communal storage: show all folders regardless of owner
     child_folders = (
         FileFolder.query.filter_by(
-            owner_id=current_user.id,
             parent_id=current_folder.id if current_folder else None,
         )
         .order_by(FileFolder.name.asc())
         .all()
     )
 
-    file_query = FileAsset.query.filter_by(owner_id=current_user.id)
+    # Communal storage: show all files regardless of owner
+    file_query = FileAsset.query
     if current_folder:
         file_query = file_query.filter(FileAsset.folder_id == current_folder.id)
     else:
@@ -190,8 +191,8 @@ def create_folder():
     name = name.replace("/", "-")[:120]
     parent = _resolve_folder(parent_id)
 
+    # Communal storage: check for duplicate folder names globally
     duplicate = FileFolder.query.filter_by(
-        owner_id=current_user.id,
         parent_id=parent.id if parent else None,
         name=name,
     ).first()
@@ -224,9 +225,8 @@ def create_folder():
 @files_bp.route("/folders/<int:folder_id>/delete", methods=["POST"])
 @login_required
 def delete_folder(folder_id: int):
-    folder = FileFolder.query.filter_by(
-        id=folder_id, owner_id=current_user.id
-    ).first_or_404()
+    # Communal storage: anyone can delete any folder
+    folder = FileFolder.query.filter_by(id=folder_id).first_or_404()
     return_folder = request.form.get("current_folder_id", type=int)
 
     if folder.children or folder.files:
@@ -297,9 +297,8 @@ def rename_folder(folder_id: int):
 @files_bp.route("/files/<int:file_id>/rename", methods=["POST"])
 @login_required
 def rename_file(file_id: int):
+    # Communal storage: anyone can rename any file
     asset = FileAsset.query.get_or_404(file_id)
-    if asset.owner_id != current_user.id:
-        abort(403)
 
     new_name = (request.form.get("name") if not request.is_json else (request.json or {}).get("name")) or ""
     new_name = new_name.strip()
@@ -336,10 +335,9 @@ def update_position():
     except (TypeError, ValueError):
         return jsonify({"status": "error", "message": "Invalid coordinates."}), 400
 
+    # Communal storage: anyone can reposition any file or folder
     if obj_type == "file":
         asset = FileAsset.query.get_or_404(int(obj_id))
-        if asset.owner_id != current_user.id:
-            abort(403)
         asset.pos_x = pos_x
         asset.pos_y = pos_y
         db.session.commit()
@@ -347,8 +345,6 @@ def update_position():
 
     if obj_type == "folder":
         folder = FileFolder.query.get_or_404(int(obj_id))
-        if folder.owner_id != current_user.id:
-            abort(403)
         folder.pos_x = pos_x
         folder.pos_y = pos_y
         db.session.commit()
@@ -407,9 +403,8 @@ def upload():
 @files_bp.route("/move/<int:file_id>", methods=["POST"])
 @login_required
 def move(file_id: int):
+    # Communal storage: anyone can move any file
     asset = FileAsset.query.get_or_404(file_id)
-    if asset.owner_id != current_user.id:
-        abort(403)
 
     target_folder_id = request.form.get("folder_id")
     current_folder_id = request.form.get("current_folder_id", type=int)
@@ -453,9 +448,8 @@ def move(file_id: int):
 @files_bp.route("/download/<int:file_id>", methods=["GET"])
 @login_required
 def download(file_id: int):
+    # Communal storage: anyone can download any file
     asset = FileAsset.query.get_or_404(file_id)
-    if asset.owner_id != current_user.id:
-        abort(403)
 
     file_path = _asset_path(asset)
     if not file_path.exists():
@@ -474,9 +468,8 @@ def download(file_id: int):
 @files_bp.route("/preview/<int:file_id>", methods=["GET"])
 @login_required
 def preview(file_id: int):
+    # Communal storage: anyone can preview any file
     asset = FileAsset.query.get_or_404(file_id)
-    if asset.owner_id != current_user.id:
-        abort(403)
 
     if not asset.mime_type or not asset.mime_type.startswith("image/"):
         abort(404)
@@ -498,9 +491,8 @@ def preview(file_id: int):
 @files_bp.route("/share/<int:file_id>", methods=["POST"])
 @login_required
 def enable_share(file_id: int):
+    # Communal storage: anyone can enable sharing for any file
     asset = FileAsset.query.get_or_404(file_id)
-    if asset.owner_id != current_user.id:
-        abort(403)
 
     rotate = request.form.get("rotate") == "1"
     if asset.share_token is None or rotate:
@@ -517,9 +509,8 @@ def enable_share(file_id: int):
 @files_bp.route("/unshare/<int:file_id>", methods=["POST"])
 @login_required
 def disable_share(file_id: int):
+    # Communal storage: anyone can disable sharing for any file
     asset = FileAsset.query.get_or_404(file_id)
-    if asset.owner_id != current_user.id:
-        abort(403)
 
     if asset.share_token is None:
         flash("That file was not shared beyond your grove.", "info")
@@ -535,9 +526,8 @@ def disable_share(file_id: int):
 @files_bp.route("/delete/<int:file_id>", methods=["POST"])
 @login_required
 def delete(file_id: int):
+    # Communal storage: anyone can delete any file
     asset = FileAsset.query.get_or_404(file_id)
-    if asset.owner_id != current_user.id:
-        abort(403)
 
     file_path = _asset_path(asset)
     user_root = _user_storage_root(asset.owner_id)
@@ -569,4 +559,23 @@ def shared_download(token: str):
         as_attachment=True,
         download_name=asset.original_name,
         mimetype=asset.mime_type,
+    )
+
+
+@files_bp.route("/wordpress-kyber", methods=["GET"])
+def wordpress_kyber():
+    """Feature page for WordPress Kyber encryption plugin."""
+    return render_template("files/wordpress_kyber.html")
+
+
+@files_bp.route("/downloads/wordpress-kyber", methods=["GET"])
+def download_wordpress_kyber():
+    """Direct download link for WP-KyberCrypt plugin."""
+    downloads_dir = Path(current_app.root_path) / "static" / "downloads"
+    return send_from_directory(
+        downloads_dir,
+        "wp-kybercrypt-v1.0.0.zip",
+        as_attachment=True,
+        download_name="wp-kybercrypt-v1.0.0.zip",
+        mimetype="application/zip",
     )

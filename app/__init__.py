@@ -19,7 +19,7 @@ except ImportError:
 
 from .config import Config
 from .database import db
-from .extensions import login_manager
+from .extensions import login_manager, sock
 from .neod import init_neod_service
 
 
@@ -55,6 +55,7 @@ def create_app() -> Flask:
 
     db.init_app(app)
     login_manager.init_app(app)
+    sock.init_app(app)
 
     app.wsgi_app = ProxyFix(  # type: ignore[assignment]
         app.wsgi_app,
@@ -89,6 +90,7 @@ def create_app() -> Flask:
         models.ensure_file_schema()
         models.ensure_user_schema()
         models.ensure_circle_schema()
+        models.ensure_chat_schema()
 
         tables_after = set(inspect(db.engine).get_table_names())
         app.logger.info("Database tables present after initialization: %s", sorted(tables_after))
@@ -110,6 +112,13 @@ def create_app() -> Flask:
             models.ensure_admin_user()
         except Exception:
             app.logger.exception("Failed to ensure arch administrator account.")
+
+        try:
+            from .chat import ensure_archdruid_user
+
+            ensure_archdruid_user()
+        except Exception:
+            app.logger.exception("Failed to ensure archdruid chat account.")
 
         neod_service = init_neod_service(app)
         if neod_service:
@@ -163,8 +172,10 @@ def create_app() -> Flask:
     from .social import social_bp
     from .ai import ai_bp
     from .api import api_bp, legacy_api_bp
+    from .kyber_api import kyber_api_bp
     from .neod_views import neod_bp
     from .arch import arch_bp
+    from .chat import chat_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(files_bp)
@@ -172,7 +183,9 @@ def create_app() -> Flask:
     app.register_blueprint(ai_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(legacy_api_bp)
+    app.register_blueprint(kyber_api_bp)
     app.register_blueprint(neod_bp)
     app.register_blueprint(arch_bp)
+    app.register_blueprint(chat_bp)
 
     return app

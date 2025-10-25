@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
 {% block content %}
 {% if druid.profile_css %}
 <style id="awen-profile-style">
@@ -16,7 +17,7 @@
     >
     {% endif %}
     <div>
-      <h1>{{ druid.username }}</h1>
+      <h1 class="profile-name">{{ ui.user_chip(druid, size='md', link=None) }}</h1>
       <p>{{ druid.bio or "This member has not yet shared their story." }}</p>
       
       {% if druid.circle_membership %}

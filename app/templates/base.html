@@ -11,7 +11,7 @@
     </style>
     {% endif %}
   </head>
-  <body>
+  <body class="{{ body_class | default('') }}" data-default-avatar="{{ url_for('static', filename='img/triple.svg.png') }}">
     <nav class="nav">
       <div class="nav-inner">
         <div class="nav-brand">
@@ -32,7 +32,7 @@
         <a href="{{ url_for('neod.donate') }}">💎 NEOD</a>
         
         {% if current_user.is_arch %}
-        <a href="{{ url_for('arch.dashboard') }}">steward</a>
+        <a href="{{ url_for('arch.dashboard') }}">🌱 steward</a>
         {% endif %}
         <form action="{{ url_for('auth.logout') }}" method="post" class="inline-form">
           <button type="submit" class="linkish">Depart</button>
@@ -59,6 +59,16 @@
     <script src="{{ url_for('static', filename='js/nav.js') }}?v=20251014"></script>
     <script src="{{ url_for('static', filename='js/hollow.js') }}?v=20251014"></script>
     <script src="{{ url_for('static', filename='js/insight.js') }}?v=20251014"></script>
+    <script src="{{ url_for('static', filename='js/login_bg.js') }}?v=20251014"></script>
+    {% if current_user.is_authenticated %}
+    <div class="messenger-dock" data-messenger-dock>
+      <span class="dock-indicator" aria-hidden="true"></span>
+      <span class="dock-label">Messages</span>
+    </div>
+    <div class="messenger-tray" data-messenger-tray></div>
+    <script src="{{ url_for('static', filename='js/chat_tone.js') }}?v=20251014"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}?v=20251014"></script>
+    {% endif %}
     {% block extra_scripts %}{% endblock %}
   </body>
 </html>

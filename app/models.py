@@ -39,12 +39,20 @@ class User(UserMixin, db.Model):
     grove = db.Column(db.String(120), nullable=True)
     role = db.Column(db.String(32), nullable=False, default="member")
     status = db.Column(db.String(16), nullable=False, default="active")
+    join_reason = db.Column(db.Text, nullable=True)
     profile_image = db.Column(db.String(255), nullable=True)
     profile_html = db.Column(db.Text, nullable=True)
     profile_css = db.Column(db.Text, nullable=True)
     profile_js = db.Column(db.Text, nullable=True)
     suspended_until = db.Column(db.DateTime, nullable=True)
     last_seen = db.Column(db.DateTime, nullable=True)
+    chat_public_key = db.Column(db.LargeBinary, nullable=True)
+    chat_private_key_encrypted = db.Column(db.LargeBinary, nullable=True)
+    chat_private_key_nonce = db.Column(db.LargeBinary, nullable=True)
+    chat_key_salt = db.Column(db.LargeBinary, nullable=True)
+    chat_identity_version = db.Column(db.Integer, nullable=True)
+    chat_enabled_at = db.Column(db.DateTime, nullable=True)
+    chat_keys_rotated_at = db.Column(db.DateTime, nullable=True)
 
     posts = db.relationship("Post", back_populates="author", cascade="all, delete")
     comments = db.relationship(
@@ -68,6 +76,16 @@ class User(UserMixin, db.Model):
         back_populates="owner",
         cascade="all, delete-orphan",
         order_by="FileFolder.name.asc()",
+    )
+    chat_threads_created = db.relationship(
+        "ChatThread",
+        back_populates="creator",
+        cascade="all, delete-orphan",
+    )
+    chat_messages_sent = db.relationship(
+        "ChatMessage",
+        back_populates="sender",
+        cascade="all, delete-orphan",
     )
 
     @staticmethod
@@ -125,6 +143,16 @@ class User(UserMixin, db.Model):
             return False
         return datetime.utcnow() - last_seen <= timedelta(minutes=5)
 
+    @property
+    def has_chat_keys(self) -> bool:
+        return all(
+            (
+                self.chat_public_key,
+                self.chat_private_key_encrypted,
+                self.chat_private_key_nonce,
+                self.chat_key_salt,
+            )
+        )
 
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
@@ -183,6 +211,109 @@ class Comment(db.Model):
 
     def __repr__(self) -> str:
         return f"<Comment {self.id} on post {self.post_id}>"
+
+
+class ChatThread(db.Model):
+    __tablename__ = "chat_threads"
+
+    id = db.Column(db.Integer, primary_key=True)
+    type = db.Column(db.String(16), nullable=False)  # dm or group
+    title = db.Column(db.String(120), nullable=True)
+    creator_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    creator = db.relationship("User", back_populates="chat_threads_created")
+    members = db.relationship(
+        "ChatThreadMember",
+        back_populates="thread",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    messages = db.relationship(
+        "ChatMessage",
+        back_populates="thread",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ChatMessage.created_at.asc()",
+    )
+
+    __table_args__ = (
+        db.Index("ix_chat_threads_type_created", "type", "created_at"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ChatThread {self.id} {self.type}>"
+
+
+class ChatThreadMember(db.Model):
+    __tablename__ = "chat_thread_members"
+
+    id = db.Column(db.Integer, primary_key=True)
+    thread_id = db.Column(db.Integer, db.ForeignKey("chat_threads.id", ondelete="CASCADE"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    joined_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
+
+    thread = db.relationship("ChatThread", back_populates="members")
+    user = db.relationship("User", backref="chat_thread_memberships")
+
+    __table_args__ = (
+        db.UniqueConstraint("thread_id", "user_id", name="uq_thread_user"),
+        db.Index("ix_chat_thread_members_user", "user_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ChatThreadMember thread={self.thread_id} user={self.user_id}>"
+
+
+class ChatMessage(db.Model):
+    __tablename__ = "chat_messages"
+
+    id = db.Column(db.Integer, primary_key=True)
+    thread_id = db.Column(db.Integer, db.ForeignKey("chat_threads.id", ondelete="CASCADE"), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    body_ciphertext = db.Column(db.LargeBinary, nullable=False)
+    body_nonce = db.Column(db.LargeBinary, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    thread = db.relationship("ChatThread", back_populates="messages")
+    sender = db.relationship("User", back_populates="chat_messages_sent")
+    keys = db.relationship(
+        "ChatMessageKey",
+        back_populates="message",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    __table_args__ = (
+        db.Index("ix_chat_messages_thread_created", "thread_id", "created_at"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ChatMessage {self.id} thread={self.thread_id}>"
+
+
+class ChatMessageKey(db.Model):
+    __tablename__ = "chat_message_keys"
+
+    id = db.Column(db.Integer, primary_key=True)
+    message_id = db.Column(db.Integer, db.ForeignKey("chat_messages.id", ondelete="CASCADE"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    kem_ciphertext = db.Column(db.LargeBinary, nullable=False)
+    wrapped_key = db.Column(db.LargeBinary, nullable=False)
+    wrap_nonce = db.Column(db.LargeBinary, nullable=False)
+    read_at = db.Column(db.DateTime, nullable=True)
+
+    message = db.relationship("ChatMessage", back_populates="keys")
+    user = db.relationship("User", backref="chat_message_keys")
+
+    __table_args__ = (
+        db.UniqueConstraint("message_id", "user_id", name="uq_message_user"),
+        db.Index("ix_chat_message_keys_user", "user_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ChatMessageKey message={self.message_id} user={self.user_id}>"
 
 
 class FileFolder(db.Model):
@@ -313,6 +444,8 @@ def ensure_file_schema() -> None:
 def ensure_user_schema() -> None:
     """Add role/status metadata to users for admin and approval controls."""
     engine = db.get_engine()
+    dialect = engine.dialect.name
+    blob_type = "BYTEA" if dialect == "postgresql" else "BLOB"
     with engine.begin() as connection:
         # PostgreSQL-compatible column check
         inspector = sa.inspect(engine)
@@ -322,6 +455,8 @@ def ensure_user_schema() -> None:
             connection.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(32) DEFAULT 'member'"))
         if "status" not in columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN status VARCHAR(16) DEFAULT 'active'"))
+        if "join_reason" not in columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN join_reason TEXT"))
         if "profile_image" not in columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN profile_image VARCHAR(255)"))
         if "profile_html" not in columns:
@@ -334,6 +469,20 @@ def ensure_user_schema() -> None:
             connection.execute(text("ALTER TABLE users ADD COLUMN suspended_until TIMESTAMP"))
         if "last_seen" not in columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN last_seen TIMESTAMP"))
+        if "chat_public_key" not in columns:
+            connection.execute(text(f"ALTER TABLE users ADD COLUMN chat_public_key {blob_type}"))
+        if "chat_private_key_encrypted" not in columns:
+            connection.execute(text(f"ALTER TABLE users ADD COLUMN chat_private_key_encrypted {blob_type}"))
+        if "chat_private_key_nonce" not in columns:
+            connection.execute(text(f"ALTER TABLE users ADD COLUMN chat_private_key_nonce {blob_type}"))
+        if "chat_key_salt" not in columns:
+            connection.execute(text(f"ALTER TABLE users ADD COLUMN chat_key_salt {blob_type}"))
+        if "chat_identity_version" not in columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN chat_identity_version INTEGER"))
+        if "chat_enabled_at" not in columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN chat_enabled_at TIMESTAMP"))
+        if "chat_keys_rotated_at" not in columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN chat_keys_rotated_at TIMESTAMP"))
 
 
 def ensure_circle_schema() -> None:
@@ -379,3 +528,13 @@ def ensure_admin_user() -> None:
     if dirty:
         db.session.add(admin)
         db.session.commit()
+
+
+def ensure_chat_schema() -> None:
+    """Ensure encrypted chat tables exist."""
+    engine = db.get_engine()
+    with engine.begin() as connection:
+        ChatThread.__table__.create(bind=connection, checkfirst=True)
+        ChatThreadMember.__table__.create(bind=connection, checkfirst=True)
+        ChatMessage.__table__.create(bind=connection, checkfirst=True)
+        ChatMessageKey.__table__.create(bind=connection, checkfirst=True)

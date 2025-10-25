@@ -25,6 +25,9 @@
       <a href="{{ url_for('files.index', folder=crumb.id) }}" class="crumb" data-folder-target="{{ crumb.id }}">{{ crumb.name }}</a>
       {% endif %}
       {% endfor %}
+      <span style="margin-left: auto;">
+        <a href="{{ url_for('files.wordpress_kyber') }}" class="pill pill-ghost" style="font-size: 0.85rem;">🔐 WP-KyberCrypt Plugin</a>
+      </span>
     </nav>
 
     <form id="hollow-upload-form" action="{{ url_for('files.upload') }}" method="post" enctype="multipart/form-data" class="hollow-upload">

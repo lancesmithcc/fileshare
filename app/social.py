@@ -162,7 +162,7 @@ def _build_post_context(post: Post) -> dict:
 def index():
     if current_user.is_authenticated:
         return redirect(url_for("social.feed"))
-    return render_template("social/landing.html")
+    return redirect(url_for("auth.login"))
 
 
 @social_bp.route("/feed")

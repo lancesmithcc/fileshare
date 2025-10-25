@@ -6,7 +6,7 @@ from typing import Optional
 
 import base58
 from flask import current_app
-from requests import HTTPError
+from requests import HTTPError, RequestException
 from solana.exceptions import SolanaRpcException
 from solana.keypair import Keypair
 from solana.publickey import PublicKey
@@ -46,6 +46,10 @@ class PaymentVerificationError(NeodServiceError):
 
 class RecipientAccountError(NeodServiceError):
     """Raised when we cannot mint or transfer NEOD to the requested recipient."""
+
+
+class SolanaNetworkError(NeodServiceError):
+    """Raised when primary and fallback Solana RPC endpoints are unavailable."""
 
 
 def _extract_signature(response) -> str:
@@ -181,9 +185,25 @@ class NeodService:
 
     def _should_retry_with_fallback(self, exc: Exception, context: str) -> bool:
         """Determine whether an RPC exception warrants retrying against the fallback."""
-        if isinstance(exc, (SolanaRpcException, HTTPError)):
+        if isinstance(exc, (SolanaRpcException, HTTPError, RequestException)):
             return self._switch_to_fallback(context)
         return False
+
+    def _fetch_transaction(self, signature: str) -> dict:
+        """Fetch a parsed transaction, handling RPC compatibility quirks."""
+        kwargs = {
+            "commitment": self.commitment,
+            "encoding": "jsonParsed",
+        }
+        try:
+            return self.client.get_transaction(
+                signature,
+                max_supported_transaction_version=0,
+                **kwargs,
+            )
+        except TypeError:
+            # Older solana-py versions do not support max_supported_transaction_version.
+            return self.client.get_transaction(signature, **kwargs)
 
     # Public API -----------------------------------------------------------------
     def bootstrap(self) -> Optional[NeodMint]:
@@ -323,7 +343,7 @@ class NeodService:
                 token_client.get_account_info(ata)
                 return ata
             except Exception as lookup_exc:
-                if isinstance(lookup_exc, (SolanaRpcException, HTTPError)) and attempts < 3:
+                if isinstance(lookup_exc, (SolanaRpcException, HTTPError, RequestException)) and attempts < 3:
                     if self._should_retry_with_fallback(lookup_exc, "associated account lookup"):
                         attempts += 1
                         continue
@@ -332,7 +352,7 @@ class NeodService:
                     token_client.create_associated_token_account(owner)
                     return ata
                 except Exception as create_exc:
-                    if isinstance(create_exc, (SolanaRpcException, HTTPError)) and attempts < 3:
+                    if isinstance(create_exc, (SolanaRpcException, HTTPError, RequestException)) and attempts < 3:
                         if self._should_retry_with_fallback(create_exc, "associated account creation"):
                             attempts += 1
                             continue
@@ -401,19 +421,28 @@ class NeodService:
         attempts = 0
         while True:
             try:
-                response = self.client.get_transaction(
-                    signature,
-                    commitment=self.commitment,
-                    encoding="jsonParsed",
-                    max_supported_transaction_version=0,
-                )
+                response = self._fetch_transaction(signature)
             except Exception as exc:
-                if isinstance(exc, (SolanaRpcException, HTTPError)) and attempts < 3:
+                if isinstance(exc, (SolanaRpcException, HTTPError, RequestException)) and attempts < 3:
                     if self._should_retry_with_fallback(exc, "payment verification"):
                         attempts += 1
                         continue
-                raise ServiceConfigurationError("Unable to reach Solana RPC to verify payment.") from exc
-            break
+                self.logger.error(
+                    "Unable to reach Solana RPC while verifying payment %s after %s attempt(s) on %s",
+                    signature,
+                    attempts + 1,
+                    self.rpc_url,
+                    exc_info=True,
+                )
+                raise SolanaNetworkError("Unable to reach Solana RPC to verify payment.") from exc
+            else:
+                if attempts > 0:
+                    self.logger.info(
+                        "Solana payment verification succeeded after %s fallback attempt(s) on %s",
+                        attempts,
+                        self.rpc_url,
+                    )
+                break
 
         result = response.get("result")
         if not result:
@@ -475,7 +504,7 @@ class NeodService:
             except RecipientAccountError:
                 raise
             except Exception as exc:
-                if isinstance(exc, (SolanaRpcException, HTTPError)) and attempts < 3:
+                if isinstance(exc, (SolanaRpcException, HTTPError, RequestException)) and attempts < 3:
                     if self._should_retry_with_fallback(exc, "token account preparation"):
                         attempts += 1
                         continue
@@ -495,7 +524,7 @@ class NeodService:
                     ),
                 )
             except Exception as exc:
-                if isinstance(exc, (SolanaRpcException, HTTPError)) and attempts < 3:
+                if isinstance(exc, (SolanaRpcException, HTTPError, RequestException)) and attempts < 3:
                     if self._should_retry_with_fallback(exc, "NEOD transfer"):
                         attempts += 1
                         continue

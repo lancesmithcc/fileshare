@@ -1,43 +1,32 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
 {% block content %}
-<section class="grid">
+<section class="grid stream-grid">
   <div class="primary-column">
-    <article class="card neod-callout">
-      <header class="neod-callout-header">
-        <h2>Support the NEOD Grove</h2>
-        <p>Offer 0.005&nbsp;SOL to the treasury and receive 1&nbsp;NEOD to anchor the distributed network.</p>
-      </header>
-      <a class="pill pill-accent neod-callout-button" href="{{ url_for('neod.donate') }}">
-        Donate 0.005&nbsp;SOL for NEOD
-      </a>
-    </article>
-    <article class="card">
+    <header class="stream-header">
+      <h1 class="stream-title">The Stream</h1>
+      <p class="stream-subtitle">Share reflections with the grove.</p>
+    </header>
+
+    <article class="card stream-compose">
       <h2>Offer to the Stream</h2>
-      <form method="post" action="{{ url_for('social.create_post') }}" class="form">
+      <form method="post" action="{{ url_for('social.create_post') }}" class="form stream-compose-form">
         <label>
           Words for the circle
-          <textarea name="body" rows="4" required></textarea>
+          <textarea name="body" rows="4" required placeholder="Speak into the flow…"></textarea>
         </label>
-        
         <button type="submit" class="button">Share</button>
       </form>
     </article>
 
     {% for entry in post_entries %}
     {% set post = entry.record %}
-    <article class="card">
+    <article class="card stream-post">
       <header class="post-header">
         <div class="post-author">
-          <a href="{{ url_for('social.profile', username=post.author.username) }}" class="avatar-link">
-            {% if post.author.profile_image %}
-            <img src="{{ url_for('social.profile_media', asset=post.author.profile_image) }}" alt="{{ post.author.username }} avatar" class="avatar avatar-sm">
-            {% else %}
-            <img src="{{ url_for('static', filename='img/triple.svg.png') }}" alt="{{ post.author.username }} avatar" class="avatar avatar-sm">
-            {% endif %}
-          </a>
+          {{ ui.user_chip(post.author, size='md') }}
           <div class="post-author-meta">
-            <h3><a href="{{ url_for('social.profile', username=post.author.username) }}">{{ post.author.username }}</a></h3>
-            <p class="meta">{{ post.created_at.strftime('%b %d, %Y %H:%M') }}</p>
+            <p class="meta">{{ post.created_at.strftime('%b %d, %Y %H:%M') }} UTC</p>
           </div>
         </div>
         <div class="post-header-actions">
@@ -67,24 +56,36 @@
       </a>
       {% endif %}
       <section class="comments">
-        <h4>Responses</h4>
-        {% for comment in post.comments %}
-        <div class="comment">
-          <strong>{{ comment.author.username }}</strong>
-          <p>{{ comment.body }}</p>
-          <span class="meta">{{ comment.created_at.strftime('%b %d, %Y %H:%M') }}</span>
-          {% if current_user.is_authenticated and current_user.is_arch %}
-          <form method="post" action="{{ url_for('arch.remove_comment', comment_id=comment.id) }}" class="inline-form moderation-form">
-            <button type="submit" class="ghost-button danger-button">Remove</button>
-          </form>
-          {% endif %}
+        <header class="comments-header">
+          <h4>Responses</h4>
+          <span class="comments-count">{{ post.comments|length }}</span>
+        </header>
+        <div class="comments-list">
+          {% for comment in post.comments %}
+          <article class="comment">
+            {{ ui.user_chip(comment.author, size='sm') }}
+            <div class="comment-body">
+              <div class="comment-meta">
+                <time datetime="{{ comment.created_at.isoformat() }}">{{ comment.created_at.strftime('%b %d, %Y %H:%M') }} UTC</time>
+              </div>
+              <p>{{ comment.body }}</p>
+              {% if current_user.is_authenticated and current_user.is_arch %}
+              <form method="post" action="{{ url_for('arch.remove_comment', comment_id=comment.id) }}" class="inline-form moderation-form comment-moderation">
+                <button type="submit" class="ghost-button danger-button">Remove</button>
+              </form>
+              {% endif %}
+            </div>
+          </article>
+          {% else %}
+          <p class="meta comments-empty">No responses yet.</p>
+          {% endfor %}
         </div>
-        {% else %}
-        <p class="meta">No responses yet.</p>
-        {% endfor %}
         <form method="post" action="{{ url_for('social.comment', post_id=post.id) }}" class="comment-form">
+          <span class="comment-form-spacer" aria-hidden="true"></span>
           <textarea name="body" rows="2" required placeholder="Offer a reflection..."></textarea>
-          <button type="submit" class="ghost-button">Add response</button>
+          <div class="comment-form-actions">
+            <button type="submit" class="ghost-button comment-submit">Add response</button>
+          </div>
         </form>
       </section>
     </article>
@@ -94,6 +95,7 @@
   </div>
 
   <aside class="sidebar">
+    
     <section class="card">
       <h2>Circle Filter</h2>
       <form method="get" action="{{ url_for('social.feed') }}" class="form">
@@ -131,6 +133,15 @@
       </form>
       <div id="insight-output" class="insight-output hidden" role="status" aria-live="polite"></div>
     </section>
+    <article class="card neod-callout">
+      <header class="neod-callout-header">
+        <h2>Support</h2>
+        <p>Offer 0.005&nbsp;SOL to the treasury and receive 1&nbsp;NEOD to anchor the distributed network.</p>
+      </header>
+      <a class="pill pill-accent neod-callout-button" href="{{ url_for('neod.donate') }}">
+        Donate 0.005&nbsp;SOL for NEOD
+      </a>
+    </article>
   </aside>
 </section>
 {% endblock %}

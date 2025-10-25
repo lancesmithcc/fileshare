@@ -1,0 +1,177 @@
+/**
+ * Neo-Druidic Kyber - Admin Styles
+ */
+
+.ndk-admin-wrap {
+    max-width: 1400px;
+}
+
+.ndk-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+.ndk-admin-content {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 24px;
+    margin-top: 24px;
+}
+
+@media (max-width: 1200px) {
+    .ndk-admin-content {
+        grid-template-columns: 1fr;
+    }
+}
+
+.ndk-card {
+    background: #fff;
+    border: 1px solid #dcdcde;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    padding: 24px;
+    margin-bottom: 24px;
+    border-radius: 4px;
+}
+
+.ndk-card h2 {
+    margin-top: 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f0f0f1;
+}
+
+.ndk-info-card {
+    background: #f9f9f9;
+    border: 1px solid #dcdcde;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+}
+
+.ndk-info-card h3 {
+    margin-top: 0;
+    color: #1d2327;
+}
+
+.ndk-info-card ul {
+    margin: 12px 0;
+    padding-left: 20px;
+}
+
+.ndk-info-card li {
+    margin-bottom: 8px;
+}
+
+#ndk-connection-status {
+    display: inline-block;
+    margin-left: 12px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+#ndk-connection-status.success {
+    background: #d5f2e3;
+    color: #00753c;
+}
+
+#ndk-connection-status.error {
+    background: #f7d4d6;
+    color: #cc1818;
+}
+
+#ndk-connection-status.loading {
+    background: #f0f0f1;
+    color: #646970;
+}
+
+.ndk-meta-box .notice {
+    margin: 0 0 16px 0;
+}
+
+.ndk-meta-box p.description {
+    font-size: 13px;
+    color: #646970;
+    margin-top: 12px;
+}
+
+.ndk-key-preview {
+    display: inline-block;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    background: #f6f7f7;
+    padding: 4px 8px;
+    border-radius: 3px;
+    color: #50575e;
+}
+
+.ndk-empty-state {
+    text-align: center;
+    padding: 40px 20px !important;
+    color: #646970;
+}
+
+.ndk-info-banner {
+    background: #fff8e5;
+    border-left: 4px solid #f0b429;
+    padding: 20px;
+    margin-top: 24px;
+}
+
+.ndk-info-banner h3 {
+    margin-top: 0;
+    color: #1d2327;
+}
+
+.ndk-decrypted-content {
+    border-left: 3px solid #667eea;
+    padding-left: 16px;
+    background: linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, transparent 100%);
+}
+
+.ndk-error {
+    background: #f7d4d6;
+    color: #cc1818;
+    padding: 12px;
+    border-radius: 4px;
+    border-left: 3px solid #cc1818;
+}
+
+.ndk-encrypted-shortcode {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    padding: 16px;
+    border-radius: 6px;
+    text-align: center;
+    color: #667eea;
+    font-weight: 500;
+}
+
+.ndk-decrypted-shortcode {
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    border-radius: 6px;
+    padding: 16px;
+    background: white;
+}
+
+/* Animations */
+@keyframes ndk-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.ndk-loading::before {
+    content: "⟳ ";
+    display: inline-block;
+    animation: ndk-spin 1s linear infinite;
+}

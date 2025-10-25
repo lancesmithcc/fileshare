@@ -16,7 +16,7 @@ from flask_login import current_user
 from .database import db
 from .extensions import login_manager
 from .models import Comment, Post, User
-from .site_settings import ALLOWED_SETTING_KEYS, get_site_settings, update_settings
+from .site_settings import ALLOWED_SETTING_KEYS, update_settings
 
 arch_bp = Blueprint("arch", __name__, url_prefix="/arch")
 
@@ -47,13 +47,11 @@ def dashboard():
         .order_by(User.username.asc())
         .all()
     )
-    settings = get_site_settings()
     return render_template(
         "arch/dashboard.html",
         pending_members=pending_members,
         active_members=active_members,
         suspended_members=suspended_members,
-        settings=settings,
     )
 
 

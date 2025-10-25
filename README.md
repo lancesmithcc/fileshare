@@ -6,9 +6,11 @@ A small community hub for the Neo Druidic Society. Members can join circles, sha
 - Member registration, login, and profile pages with optional grove/circle affiliation.
 - Gathering Stream for posting updates, ritual ideas, and commenting.
 - Circle directory for quick visibility into active groups.
+- End-to-end encrypted direct messages powered by Kyber (ML-KEM 768) with AES-GCM wrapping so even the database only stores ciphertext.
 - AI Archdruid panel that runs against a local `llama.cpp`-compatible model to keep every inference private and offline.
 - API-ready LLM access (`/api/v1`) with pluggable model registry and optional API keys.
 - Shared Hollow file space for uploading, downloading, and sharing files across your local network.
+- Messenger-style encrypted threads for direct messages and small group rooms, all using Kyber-wrapped session keys.
 
 ## Tech Stack
 - Python 3.10, Flask, SQLAlchemy, Flask-Login.
@@ -62,6 +64,19 @@ A small community hub for the Neo Druidic Society. Members can join circles, sha
    flask run
    ```
    The site will be reachable at http://127.0.0.1:5000.
+
+## Encrypted Whispers
+
+Members can now exchange end-to-end encrypted messages inside the **🔐 whispers** section. The flow is intentionally lightweight:
+
+1. Keys are provisioned automatically the first time a member registers or signs in. The private half is encrypted client-side with AES-GCM using the member’s account password.
+2. Locking a session simply clears the decrypted key from the browser; entering the account password restores access without re-generating anything.
+3. Launch direct messages or group rooms from the left sidebar or the floating messenger panes. New messages fan out in real-time via WebSockets, and each payload is sealed server-side with fresh ML-KEM–wrapped symmetric keys so the database only stores ciphertext. (Full client-side PQ encryption is on the roadmap once a browser Kyber module is integrated.)
+4. The Archdruid AI appears alongside members as a regular contact—message “archdruid” directly or invite Eldara into group rooms and she’ll answer with locally generated guidance.
+
+Customize the Archdruid persona’s credentials with `NEO_DRUIDIC_ARCHDRUID_USERNAME`, `NEO_DRUIDIC_ARCHDRUID_EMAIL`, or `NEO_DRUIDIC_ARCHDRUID_PASSWORD` if you want to rename or hide the built-in account.
+
+All of the crypto tooling lives in `app/chat_crypto.py`, and high-level tests cover both the primitives (`tests/test_chat_crypto.py`) and the Flask routes (`tests/test_chat_routes.py`).
 
 ## Fonts
 

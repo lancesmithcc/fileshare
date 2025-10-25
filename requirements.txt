@@ -4,8 +4,12 @@ Flask-SQLAlchemy>=3.0
 Werkzeug>=2.3
 python-dotenv>=1.0
 requests>=2.31.0
+cryptography>=41.0.0
+Flask-Sock>=0.7.0
+simple-websocket>=0.10.1
 # Optional for local AI insights
 llama-cpp-python>=0.2.0
 solana>=0.25.0,<0.26.0
 base58>=2.1.0
 psycopg2-binary
+pqcrypto>=0.3.4

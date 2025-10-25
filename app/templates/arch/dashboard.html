@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_macros.html" as ui %}
 {% block content %}
 <section class="arch-header">
   <h1>Arch Sanctum</h1>
@@ -14,15 +15,17 @@
         <th>Name</th>
         <th>Email</th>
         <th>Grove</th>
+        <th>Reason</th>
         <th class="arch-actions">Actions</th>
       </tr>
     </thead>
     <tbody>
       {% for member in pending_members %}
       <tr>
-        <td>{{ member.username }}</td>
+        <td>{{ ui.user_chip(member, size='sm') }}</td>
         <td>{{ member.email }}</td>
         <td>{{ member.grove or "—" }}</td>
+        <td>{{ member.join_reason or "—" }}</td>
         <td class="arch-actions">
           <div class="arch-inline-actions">
             <form method="post" action="{{ url_for('arch.approve_user', user_id=member.id) }}">
@@ -57,7 +60,7 @@
     <tbody>
       {% for member in active_members %}
       <tr>
-        <td>{{ member.username }}</td>
+        <td>{{ ui.user_chip(member, size='sm') }}</td>
         <td>{{ member.email }}</td>
         <td>
           {% if member.is_arch %}
@@ -112,7 +115,7 @@
     <tbody>
       {% for member in suspended_members %}
       <tr>
-        <td>{{ member.username }}</td>
+        <td>{{ ui.user_chip(member, size='sm') }}</td>
         <td>{{ member.email }}</td>
         <td>
           {% if member.suspended_until %}
@@ -151,37 +154,4 @@
   {% endif %}
 </section>
 
-<section class="arch-section">
-  <h2>Site Identity &amp; Copy</h2>
-  <form method="post" action="{{ url_for('arch.store_settings') }}" class="arch-form">
-    <div class="field">
-      <label for="site_title">Site Title</label>
-      <input id="site_title" name="site_title" type="text" value="{{ settings.site_title }}" required>
-    </div>
-    <div class="field">
-      <label for="hero_title">Landing Headline</label>
-      <input id="hero_title" name="hero_title" type="text" value="{{ settings.hero_title }}" required>
-    </div>
-    <div class="field">
-      <label for="hero_subtitle">Landing Subheading</label>
-      <input id="hero_subtitle" name="hero_subtitle" type="text" value="{{ settings.hero_subtitle }}" required>
-    </div>
-    <div class="field">
-      <label for="landing_description">Landing Description</label>
-      <textarea id="landing_description" name="landing_description" rows="4">{{ settings.landing_description }}</textarea>
-    </div>
-    <button type="submit" class="button">Save Copy</button>
-  </form>
-</section>
-
-<section class="arch-section">
-  <h2>Custom CSS</h2>
-  <form method="post" action="{{ url_for('arch.store_settings') }}" class="arch-form">
-    <div class="field">
-      <label for="custom_css">Stylesheet Override</label>
-      <textarea id="custom_css" name="custom_css" rows="10" spellcheck="false">{{ settings.custom_css }}</textarea>
-    </div>
-    <button type="submit" class="button">Save Styles</button>
-  </form>
-</section>
 {% endblock %}

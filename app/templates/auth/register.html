@@ -3,32 +3,23 @@
 <h1>Join the Circle</h1>
 <form method="post" class="card form">
   <label>
-    Chosen Name
+    handle
     <input type="text" name="username" required autofocus>
   </label>
   <label>
-    Missive Email
+    email
     <input type="email" name="email" required>
   </label>
   <label>
-    Secret Phrase
+    password
     <input type="password" name="password" required>
   </label>
   <label>
-    Grove (Optional)
-    <input type="text" name="grove" placeholder="e.g. Silver Birch Grove">
+    What calls you to the Circle?
+    <textarea name="join_reason" rows="3" required placeholder="Share your intent for joining..."></textarea>
   </label>
-  <label>
-    Choose or Found a Circle
-    <input list="circle-list" name="circle" placeholder="Forest Keepers">
-    <datalist id="circle-list">
-      {% for circle in circles %}
-      <option value="{{ circle.name }}">
-      {% endfor %}
-    </datalist>
-  </label>
-  <button type="submit" class="button">Join</button>
+  <button type="submit" class="button">apply</button>
 </form>
-<p class="form-help">Newly registered members remain pending until an arch druid approves them.</p>
-<p>Already a member? <a href="{{ url_for('auth.login') }}">Sign in.</a></p>
+<p class="form-help">Newly registered members remain pending until a steward approves.</p>
+<p>already a member? <a href="{{ url_for('auth.login') }}">Sign in.</a></p>
 {% endblock %}

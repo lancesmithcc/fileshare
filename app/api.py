@@ -16,6 +16,7 @@ from .neod import (
     PaymentNotFound,
     PaymentVerificationError,
     RecipientAccountError,
+    SolanaNetworkError,
     ServiceConfigurationError,
     get_neod_service,
 )
@@ -145,6 +146,66 @@ def neod_info():
     return jsonify({"status": "ok", "neod": details})
 
 
+@api_bp.route("/neod/blockhash", methods=["GET"])
+def neod_blockhash():
+    try:
+        service = get_neod_service()
+    except ServiceConfigurationError as exc:
+        return jsonify({"error": str(exc)}), 503
+
+    def extract(response: Dict[str, Any]):
+        result = response.get("result") if isinstance(response, dict) else None
+        value = result.get("value") if isinstance(result, dict) else None
+        context = result.get("context") if isinstance(result, dict) else None
+        blockhash = value.get("blockhash") if isinstance(value, dict) else None
+        last_valid = value.get("lastValidBlockHeight") if isinstance(value, dict) else None
+        slot = context.get("slot") if isinstance(context, dict) else None
+        lamports_per_signature = None
+        if isinstance(value, dict):
+            fee_calculator = value.get("feeCalculator")
+            if isinstance(fee_calculator, dict):
+                lamports_per_signature = fee_calculator.get("lamportsPerSignature")
+        return blockhash, last_valid, slot, lamports_per_signature
+
+    try:
+        latest_response = service.client.get_latest_blockhash(commitment=service.commitment)
+        blockhash, last_valid, slot, _ = extract(latest_response)
+        if blockhash:
+            return jsonify(
+                {
+                    "status": "ok",
+                    "blockhash": blockhash,
+                    "last_valid_block_height": last_valid,
+                    "slot": slot,
+                    "commitment": service.commitment,
+                    "source": "getLatestBlockhash",
+                }
+            )
+    except Exception as exc:
+        service.logger.warning("Primary blockhash fetch failed: %s", exc, exc_info=True)
+
+    try:
+        recent_response = service.client.get_recent_blockhash(commitment=service.commitment)
+        blockhash, _, slot, lamports_per_signature = extract(recent_response)
+        if blockhash:
+            return jsonify(
+                {
+                    "status": "ok",
+                    "blockhash": blockhash,
+                    "last_valid_block_height": None,
+                    "slot": slot,
+                    "commitment": service.commitment,
+                    "source": "getRecentBlockhash",
+                    "lamports_per_signature": lamports_per_signature,
+                }
+            )
+    except Exception as exc:
+        service.logger.error("Fallback blockhash fetch failed: %s", exc, exc_info=True)
+        return jsonify({"error": "Unable to fetch blockhash", "details": str(exc)}), 503
+
+    return jsonify({"error": "Blockhash unavailable"}), 503
+
+
 @api_bp.route("/neod/purchase", methods=["POST"])
 def neod_purchase():
     try:
@@ -169,6 +230,8 @@ def neod_purchase():
         return jsonify({"error": str(exc)}), 400
     except RecipientAccountError as exc:
         return jsonify({"error": str(exc)}), 422
+    except SolanaNetworkError as exc:
+        return jsonify({"error": str(exc)}), 503
     except ServiceConfigurationError as exc:
         return jsonify({"error": str(exc)}), 503
     except Exception:
@@ -202,10 +265,10 @@ def solana_rpc_proxy():
     """Proxy Solana RPC requests to avoid CORS and 403 issues from browser."""
     # No API key required for RPC proxy - it's used by the frontend
     payload = request.get_json(silent=True) or {}
-    
+
     # Always use the public fallback RPC for browser requests to avoid auth issues
     rpc_url = "https://api.mainnet-beta.solana.com"
-    
+
     try:
         import requests
         response = requests.post(
@@ -218,3 +281,53 @@ def solana_rpc_proxy():
     except Exception as exc:
         logger.error("RPC proxy error: %s", exc)
         return jsonify({"error": "RPC unavailable", "details": str(exc)}), 503
+
+
+@api_bp.route("/giphy/search", methods=["GET"])
+def giphy_search():
+    """Search GIPHY for GIFs."""
+    giphy_key = current_app.config.get("GIPHY_API_KEY")
+    if not giphy_key:
+        return jsonify({"error": "GIPHY not configured"}), 503
+
+    query = request.args.get("q", "").strip()
+    if not query:
+        return jsonify({"error": "Query parameter 'q' required"}), 400
+
+    limit = min(int(request.args.get("limit", "20")), 50)
+
+    try:
+        import requests
+        response = requests.get(
+            "https://api.giphy.com/v1/gifs/search",
+            params={
+                "api_key": giphy_key,
+                "q": query,
+                "limit": limit,
+                "rating": "g",
+                "lang": "en"
+            },
+            timeout=10
+        )
+
+        if response.status_code != 200:
+            logger.error("GIPHY API error: %s", response.text)
+            return jsonify({"error": "GIPHY search failed"}), 503
+
+        data = response.json()
+        gifs = []
+        for item in data.get("data", []):
+            gifs.append({
+                "id": item.get("id"),
+                "url": item.get("images", {}).get("fixed_height", {}).get("url"),
+                "preview_url": item.get("images", {}).get("fixed_height_small", {}).get("url"),
+                "title": item.get("title", ""),
+                "width": item.get("images", {}).get("fixed_height", {}).get("width"),
+                "height": item.get("images", {}).get("fixed_height", {}).get("height"),
+            })
+
+        return jsonify({"gifs": gifs})
+
+    except Exception as exc:
+        logger.error("GIPHY search error: %s", exc)
+        return jsonify({"error": "GIPHY unavailable"}), 503

@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+
+{% block content %}
+<h1 class="page-title">Encrypted Grove Chat</h1>
+
+{% if state == "provisioning" %}
+  <section class="card">
+    <h2>Preparing Your Keys</h2>
+    <p>The grove is automatically provisioning your encrypted chat keys. Sign out and back in if this message remains.</p>
+  </section>
+{% else %}
+  <div class="chat-shell"
+       data-chat-root
+       data-state="{{ state }}"
+       data-ws-path="/chat/ws"
+       data-thread-ids='{{ thread_ids | tojson }}'
+       data-current-thread-id="{{ current_thread_id or '' }}"
+       data-max-length="{{ max_message_length }}"
+       data-current-user-id="{{ current_user.id }}">
+    <aside class="chat-sidebar">
+      <div class="chat-sidebar-header">
+        <h2>Channels</h2>
+        {% if state == "ready" %}
+        <form action="{{ url_for('chat.lock') }}" method="post">
+          <button type="submit" class="linkish lock-link">Lock</button>
+        </form>
+        {% endif %}
+      </div>
+      {% if threads %}
+        <ul class="chat-thread-list">
+          {% for entry in threads %}
+          <li class="chat-thread-item {% if selected_thread and entry.thread.id == selected_thread.thread.id %}active{% endif %}"
+              data-thread-id="{{ entry.thread.id }}"
+              data-is-group="{{ 1 if entry.is_group else 0 }}"
+              data-owner-id="{{ entry.owner_id }}">
+            <a href="{{ url_for('chat.index', thread=entry.thread.id) }}">
+              <div class="chat-thread-title">
+                <span class="chat-thread-name">
+                  {% if entry.is_group %}👥{% else %}💬{% endif %}
+                  {{ entry.display_name }}
+                </span>
+                {% if entry.last_at %}
+                <time datetime="{{ entry.last_at.isoformat() }}">{{ entry.last_at.strftime('%b %d %H:%M') }}</time>
+                {% endif %}
+              </div>
+              <p class="chat-thread-preview" data-thread-preview>
+                {{ entry.preview }}
+              </p>
+              <span class="chat-thread-unread{% if not entry.unread_count %} is-hidden{% endif %}" data-thread-unread>
+                {% if entry.unread_count %}{{ entry.unread_count }}{% endif %}
+              </span>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">Begin a direct message or gather a group to open a channel.</p>
+      {% endif %}
+
+      <div class="chat-sidebar-actions">
+        <details>
+          <summary>New Direct Message</summary>
+          <form action="{{ url_for('chat.start_dm') }}" method="post" class="stacked-form">
+            <label for="dm-recipient">Member</label>
+            <select id="dm-recipient" name="recipient_id" required>
+              <option value="">Select a member…</option>
+              {% for member in active_recipients %}
+                <option value="{{ member.id }}">{{ member.username }}{% if not member.has_chat_keys %} (keys pending){% endif %}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="secondary">Open DM</button>
+          </form>
+        </details>
+        <details>
+          <summary>Create Group Room</summary>
+          <form action="{{ url_for('chat.create_group') }}" method="post" class="stacked-form">
+            <label for="group-name">Room name</label>
+            <input id="group-name" name="name" type="text" maxlength="120" placeholder="Moonlit Council">
+            <label for="group-members">Invite members</label>
+            <select id="group-members" name="members" multiple size="6">
+              {% for member in potential_group_members %}
+                <option value="{{ member.id }}">{{ member.username }}{% if not member.has_chat_keys %} (keys pending){% endif %}</option>
+              {% endfor %}
+            </select>
+            <p class="form-hint">Hold Ctrl/⌘ to choose several members at once.</p>
+            <button type="submit" class="secondary">Create Room</button>
+          </form>
+        </details>
+      </div>
+    </aside>
+
+    <section class="chat-window">
+      {% if state == "locked" %}
+        <div class="chat-placeholder">
+          <p>Enter your account password to unlock encrypted messages.</p>
+          <form action="{{ url_for('chat.unlock') }}" method="post" class="stacked-form unlock-inline">
+            <label for="unlock-passphrase">Account password</label>
+            <input id="unlock-passphrase" type="password" name="passphrase" required autocomplete="current-password">
+            <button type="submit" class="primary">Unlock</button>
+          </form>
+        </div>
+      {% elif selected_thread %}
+        <header class="chat-window-header">
+          <div>
+            <h2>{{ selected_thread.display_name }}</h2>
+            <div class="chat-window-meta">
+              {% if selected_thread.is_group %}
+                <span class="chat-room-pill">Group Channel</span>
+              {% else %}
+                <span class="chat-room-pill">Direct Message</span>
+              {% endif %}
+              {% if selected_thread_members %}
+                <div class="chat-member-list" role="list">
+                  {% for member in selected_thread_members %}
+                    <div role="listitem" class="chat-member-chip">
+                      {{ ui.user_chip(member, size='xs', link='message') }}
+                    </div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </div>
+          </div>
+          {% if selected_thread.is_group %}
+          <div class="chat-window-actions">
+            {% if selected_thread.thread.creator_id == current_user.id %}
+            <button type="button" class="ghost-button danger-button" data-thread-action="delete" data-thread-id="{{ selected_thread.thread.id }}">
+              Delete Group
+            </button>
+            {% else %}
+            <button type="button" class="ghost-button" data-thread-action="leave" data-thread-id="{{ selected_thread.thread.id }}">
+              Leave Group
+            </button>
+            {% endif %}
+          </div>
+          {% endif %}
+        </header>
+        <div class="chat-message-list" data-message-list>
+          {% if messages %}
+            {% for message in messages %}
+            <article
+              class="chat-message {% if message.is_self %}chat-message-self{% endif %}"
+              data-message-id="{{ message.id }}"
+            >
+              <div class="chat-message-meta">
+                {% if message.is_self %}
+                  {{ ui.user_chip(current_user, size='xs', link='profile', label='You') }}
+                {% else %}
+                  {{ ui.user_chip(message.sender, size='xs', link='message') }}
+                {% endif %}
+                <div class="chat-message-tools">
+                  <time datetime="{{ message.created_at.isoformat() }}">{{ message.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</time>
+                  {% if message.can_delete %}
+                  <button
+                    type="button"
+                    class="chat-message-delete"
+                    data-message-delete
+                    data-thread-id="{{ selected_thread.thread.id }}"
+                    data-message-id="{{ message.id }}"
+                    aria-label="Delete message"
+                  >×</button>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="chat-message-body">{{ message.body }}</div>
+            </article>
+            {% endfor %}
+          {% else %}
+          <p class="muted">This encrypted channel is ready for its first words.</p>
+          {% endif %}
+        </div>
+        <form action="{{ url_for('chat.send') }}" method="post" class="chat-compose" data-compose-form>
+          <input type="hidden" name="thread_id" value="{{ selected_thread.thread.id }}">
+          <label for="chat-body" class="sr-only">Message body</label>
+          <textarea id="chat-body" name="body" rows="3" maxlength="{{ max_message_length|default(4000) }}" required placeholder="Type your encrypted message…"></textarea>
+          <div class="chat-compose-actions">
+            <button type="button" class="btn btn-secondary emoji-picker-btn" data-emoji-picker-btn title="Add emoji">😊</button>
+            <button type="button" class="btn btn-secondary gif-picker-btn" data-gif-picker-btn>GIF</button>
+            <button type="submit" class="btn btn-primary">Send Encrypted Message</button>
+          </div>
+        </form>
+      {% else %}
+        <div class="chat-placeholder">
+          <p>Select or create a channel to begin an encrypted conversation.</p>
+        </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <!-- Emoji Picker Modal -->
+  <div class="emoji-picker-modal" data-emoji-picker-modal style="display: none;">
+    <div class="emoji-picker-overlay" data-emoji-picker-overlay></div>
+    <div class="emoji-picker-content">
+      <div class="emoji-picker-header">
+        <h3>Pick an Emoji</h3>
+        <button type="button" class="emoji-picker-close" data-emoji-picker-close>×</button>
+      </div>
+      <div class="emoji-picker-grid" data-emoji-grid></div>
+    </div>
+  </div>
+
+  <!-- GIPHY Picker Modal -->
+  <div class="gif-picker-modal" data-gif-picker-modal style="display: none;">
+    <div class="gif-picker-overlay" data-gif-picker-overlay></div>
+    <div class="gif-picker-content">
+      <div class="gif-picker-header">
+        <input type="text" class="gif-search-input" placeholder="Search GIPHY..." data-gif-search-input>
+        <button type="button" class="gif-picker-close" data-gif-picker-close>×</button>
+      </div>
+      <div class="gif-picker-results" data-gif-results></div>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{% if state == "ready" or state == "locked" %}
+<script src="{{ url_for('static', filename='js/emoji_picker.js') }}?v=20251024"></script>
+<script src="{{ url_for('static', filename='js/giphy.js') }}?v=20251024"></script>
+{% endif %}
+{% endblock %}

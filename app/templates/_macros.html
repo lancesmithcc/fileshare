@@ -1,0 +1,33 @@
+{% macro user_chip(user, size='sm', link='profile', label=None, include_name=True) -%}
+  {%- set display_name = label or (user and user.username) or 'Member' -%}
+  {%- if user and link == 'profile' -%}
+    {%- set href = url_for('social.profile', username=user.username) -%}
+  {%- elif user and link == 'message' -%}
+    {%- set href = url_for('chat.index', with=user.id) -%}
+  {%- elif link and link not in ('profile', 'message') -%}
+    {%- set href = link -%}
+  {%- else -%}
+    {%- set href = None -%}
+  {%- endif -%}
+  {%- set classes = 'user-chip user-chip-' ~ size -%}
+  {%- if href -%}
+  <a href="{{ href }}" class="{{ classes }}">
+  {%- else -%}
+  <span class="{{ classes }}">
+  {%- endif -%}
+    <span class="user-chip-avatar">
+      {%- if user and user.profile_image -%}
+      <img src="{{ url_for('social.profile_media', asset=user.profile_image) }}" alt="{{ display_name }} avatar">
+      {%- else -%}
+      <img src="{{ url_for('static', filename='img/triple.svg.png') }}" alt="{{ display_name }} avatar">
+      {%- endif -%}
+    </span>
+    {%- if include_name -%}
+    <span class="user-chip-name">{{ display_name }}</span>
+    {%- endif -%}
+  {%- if href -%}
+  </a>
+  {%- else -%}
+  </span>
+  {%- endif -%}
+{%- endmacro %}

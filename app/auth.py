@@ -4,7 +4,9 @@ from flask import Blueprint, current_app, flash, redirect, render_template, requ
 from flask_login import current_user, login_required, login_user, logout_user
 
 from .database import db
-from .models import Circle, CircleMembership, User
+from .models import User
+from .chat import ensure_chat_identity, provision_chat_identity
+from . import chat_session
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -18,8 +20,7 @@ def register():
         username = request.form.get("username", "").strip()
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
-        grove = request.form.get("grove", "").strip()
-        circle_name = request.form.get("circle", "").strip()
+        reason = request.form.get("join_reason", "").strip()
 
         if not username or not email or not password:
             flash("Username, email, and password are required.", "danger")
@@ -30,30 +31,22 @@ def register():
         elif User.query.filter_by(email=email).first():
             flash("Someone already receives missives at that email.", "warning")
         else:
-            user = User(username=username, email=email, grove=grove, status="pending")
+            user = User(
+                username=username,
+                email=email,
+                status="pending",
+                join_reason=reason or None,
+            )
             user.set_password(password)
+            provision_chat_identity(user, password)
             db.session.add(user)
-
-            if circle_name:
-                circle = Circle.query.filter(
-                    db.func.lower(Circle.name) == circle_name.lower()
-                ).first()
-                if circle is None:
-                    circle = Circle(
-                        name=circle_name, description="Community circle founded by members."
-                    )
-                    db.session.add(circle)
-                    db.session.flush()
-                membership = CircleMembership(member=user, circle=circle)
-                db.session.add(membership)
 
             db.session.commit()
             current_app.logger.info("New membership awaiting approval: %s", username)
             flash("Your request is with the arch druids. You will be notified once approved.", "info")
             return redirect(url_for("auth.login"))
 
-    circles = Circle.query.order_by(Circle.name.asc()).all()
-    return render_template("auth/register.html", circles=circles)
+    return render_template("auth/register.html")
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -92,8 +85,10 @@ def login():
                     flash("Your account is not active. Reach out to the arch druids for assistance.", "danger")
                 return redirect(url_for("auth.login"))
             user.last_seen = datetime.utcnow()
+            private_key = ensure_chat_identity(user, password)
             db.session.add(user)
             db.session.commit()
+            chat_session.store_private_key(private_key, user.chat_identity_version)
             login_user(user, remember=remember)
             flash("The circle recognizes you. Welcome back.", "success")
             return redirect(url_for("social.feed"))
@@ -106,6 +101,7 @@ def login():
 @auth_bp.route("/logout", methods=["POST"])
 @login_required
 def logout():
+    chat_session.clear_private_key()
     logout_user()
     flash("Until the next gathering.", "info")
     return redirect(url_for("auth.login"))
