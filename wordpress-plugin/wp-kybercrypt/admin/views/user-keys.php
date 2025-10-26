@@ -23,7 +23,9 @@ if ( ! defined( 'ABSPATH' ) ) {
                 <tr>
                     <th><?php _e( 'User', 'wp-kybercrypt' ); ?></th>
                     <th><?php _e( 'Email', 'wp-kybercrypt' ); ?></th>
+                    <th><?php _e( 'Key ID', 'wp-kybercrypt' ); ?></th>
                     <th><?php _e( 'Public Key', 'wp-kybercrypt' ); ?></th>
+                    <th><?php _e( 'Status', 'wp-kybercrypt' ); ?></th>
                     <th><?php _e( 'Created', 'wp-kybercrypt' ); ?></th>
                     <th><?php _e( 'Actions', 'wp-kybercrypt' ); ?></th>
                 </tr>
@@ -39,9 +41,19 @@ if ( ! defined( 'ABSPATH' ) ) {
                             </td>
                             <td><?php echo esc_html( $key_data->user_email ); ?></td>
                             <td>
+                                <code><?php echo esc_html( $key_data->key_id ); ?></code>
+                            </td>
+                            <td>
                                 <code class="ndk-key-preview">
                                     <?php echo esc_html( substr( $key_data->public_key, 0, 32 ) ); ?>...
                                 </code>
+                            </td>
+                            <td>
+                                <?php if ( (int) $key_data->active === 1 ) : ?>
+                                    <span class="ndk-badge" style="background:#46b450;"><?php _e( 'Active', 'wp-kybercrypt' ); ?></span>
+                                <?php else : ?>
+                                    <span class="ndk-badge" style="background:#dc3232;"><?php _e( 'Inactive', 'wp-kybercrypt' ); ?></span>
+                                <?php endif; ?>
                             </td>
                             <td><?php echo esc_html( mysql2date( get_option( 'date_format' ), $key_data->created_at ) ); ?></td>
                             <td>
@@ -57,7 +69,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                     <?php endforeach; ?>
                 <?php else : ?>
                     <tr>
-                        <td colspan="5" class="ndk-empty-state">
+                        <td colspan="7" class="ndk-empty-state">
                             <?php _e( 'No encryption keys found. Keys are generated automatically when users create encrypted content.', 'wp-kybercrypt' ); ?>
                         </td>
                     </tr>

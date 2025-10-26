@@ -52,6 +52,9 @@ if ( ! defined( 'ABSPATH' ) ) {
                                 <p class="description">
                                     <?php _e( 'The base URL of your Neo-Druidic Kyber API endpoint. For security, this should be localhost or a private network URL.', 'wp-kybercrypt' ); ?>
                                 </p>
+                                <p class="description">
+                                    <?php _e( 'HTTP endpoints are only permitted for 127.0.0.1 / ::1. Remote or LAN services must use HTTPS and must never be exposed to the public internet.', 'wp-kybercrypt' ); ?>
+                                </p>
                             </td>
                         </tr>
 
@@ -61,14 +64,12 @@ if ( ! defined( 'ABSPATH' ) ) {
                             </th>
                             <td>
                                 <?php
-                                $api_key = NDK_Security::get_api_key();
-                                $api_key_configured = ! empty( $api_key );
-                                $api_key_source = defined( 'NDK_API_KEY' ) ? 'wp-config.php' : 'database';
+                                $api_key_configured = defined( 'NDK_API_KEY' ) && NDK_API_KEY;
                                 ?>
                                 <strong>
                                     <?php if ( $api_key_configured ) : ?>
                                         <span style="color: #46b450;">✅ CONFIGURED</span>
-                                        <span style="color: #666; font-size: 12px;">(from <?php echo esc_html( $api_key_source ); ?>)</span>
+                                        <span style="color: #666; font-size: 12px;">(from wp-config.php)</span>
                                     <?php else : ?>
                                         <span style="color: #dc3232;">❌ NOT CONFIGURED</span>
                                     <?php endif; ?>
@@ -79,7 +80,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                                         _e( '<strong>Security:</strong> API key is securely stored in wp-config.php. Do not store in database.', 'wp-kybercrypt' );
                                     } else {
                                         printf(
-                                            __( '<strong>Security Warning:</strong> For production, define <code>NDK_API_KEY</code> constant in wp-config.php instead of storing in database. See <a href="%s" target="_blank">Security Guide</a>.', 'wp-kybercrypt' ),
+                                            __( '<strong>Security Requirement:</strong> Define <code>NDK_API_KEY</code> in wp-config.php. The plugin no longer reads API keys from the database. See <a href="%s" target="_blank">Security Guide</a>.', 'wp-kybercrypt' ),
                                             plugins_url( 'SECURITY.md', dirname( dirname( __FILE__ ) ) )
                                         );
                                     }
@@ -94,14 +95,12 @@ if ( ! defined( 'ABSPATH' ) ) {
                             </th>
                             <td>
                                 <?php
-                                $passphrase = NDK_Security::get_login_key_passphrase();
-                                $passphrase_configured = ! empty( $passphrase );
-                                $passphrase_source = defined( 'NDK_LOGIN_KEY_PASSPHRASE' ) ? 'wp-config.php' : 'database';
+                                $passphrase_configured = defined( 'NDK_LOGIN_KEY_PASSPHRASE' ) && NDK_LOGIN_KEY_PASSPHRASE;
                                 ?>
                                 <strong>
                                     <?php if ( $passphrase_configured ) : ?>
                                         <span style="color: #46b450;">✅ CONFIGURED</span>
-                                        <span style="color: #666; font-size: 12px;">(from <?php echo esc_html( $passphrase_source ); ?>)</span>
+                                        <span style="color: #666; font-size: 12px;">(from wp-config.php)</span>
                                     <?php else : ?>
                                         <span style="color: #dc3232;">❌ NOT CONFIGURED</span>
                                     <?php endif; ?>
@@ -112,7 +111,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                                         _e( '<strong>Security:</strong> Login key passphrase is securely stored in wp-config.php.', 'wp-kybercrypt' );
                                     } else {
                                         printf(
-                                            __( '<strong>Security Warning:</strong> For production, define <code>NDK_LOGIN_KEY_PASSPHRASE</code> constant in wp-config.php. See <a href="%s" target="_blank">Security Guide</a>.', 'wp-kybercrypt' ),
+                                            __( '<strong>Security Requirement:</strong> Define <code>NDK_LOGIN_KEY_PASSPHRASE</code> in wp-config.php. Passphrases are no longer loaded from the database. See <a href="%s" target="_blank">Security Guide</a>.', 'wp-kybercrypt' ),
                                             plugins_url( 'SECURITY.md', dirname( dirname( __FILE__ ) ) )
                                         );
                                     }

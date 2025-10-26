@@ -63,11 +63,17 @@
         <td>{{ ui.user_chip(member, size='sm') }}</td>
         <td>{{ member.email }}</td>
         <td>
-          {% if member.is_arch %}
-          Arch Druid
-          {% else %}
-          Member
-          {% endif %}
+          <form method="post" action="{{ url_for('arch.update_user_role', user_id=member.id) }}" class="arch-role-form">
+            <select name="role" {% if member.id == current_user.id %}disabled{% endif %}>
+              <option value="member" {% if member.role == 'member' %}selected{% endif %}>Member</option>
+              <option value="arch" {% if member.role == 'arch' %}selected{% endif %}>Arch Druid</option>
+            </select>
+            {% if member.id != current_user.id %}
+            <button type="submit" class="ghost-button">Update</button>
+            {% else %}
+            <span class="arch-role-note">Your mantle</span>
+            {% endif %}
+          </form>
         </td>
         <td class="arch-actions">
           {% if not member.is_arch %}

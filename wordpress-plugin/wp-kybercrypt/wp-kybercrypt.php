@@ -3,7 +3,7 @@
  * Plugin Name: WP-KyberCrypt
  * Plugin URI: https://wp-kybercrypt.com
  * Description: Production-hardened quantum-safe encryption for WordPress using ML-KEM-768 (NIST FIPS 203). Complete end-to-end encryption with post-quantum cryptography, secure key management, and enterprise-grade access controls.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Requires at least: 5.8
  * Requires PHP: 7.4
  * Author: WP-KyberCrypt Team
@@ -13,23 +13,23 @@
  * Text Domain: wp-kybercrypt
  * Domain Path: /languages
  *
- * SECURITY ARCHITECTURE (v1.1):
+ * SECURITY ARCHITECTURE (v1.2):
  * =============================
  *
  * 1. SECRET MANAGEMENT:
- *    - API keys and passphrases stored in wp-config.php constants (NOT database)
- *    - Define NDK_API_KEY, NDK_API_URL, and NDK_LOGIN_KEY_PASSPHRASE in wp-config.php
- *    - Database contains only encrypted material and public keys
+ *    - API keys and login passphrases live exclusively in wp-config.php constants
+ *    - Database never stores secrets; migration tooling removes legacy blobs automatically
+ *    - NDK_LOGIN_KEY_PASSPHRASE is never transmitted over HTTP; Python service must read it from ENV
  *
  * 2. PYTHON SERVICE ISOLATION:
- *    - Kyber microservice MUST run on localhost or private network
- *    - Public HTTP URLs rejected, only HTTPS or localhost HTTP allowed
- *    - No passphrases transmitted over HTTP (future: use ENV on both ends)
+ *    - Kyber microservice MUST run on localhost or a private RFC1918 network
+ *    - HTTP transport is restricted to 127.0.0.1 / ::1; all other hosts require HTTPS
+ *    - Public endpoints trigger admin warnings and remote calls are refused before sending ciphertext
  *
  * 3. ACCESS CONTROL:
- *    - Per-user decrypt permissions enforced before any decrypt operation
- *    - No automatic fallback to admin/user 1
- *    - Logged-out users never see decrypted content
+ *    - NDK_Security::can_current_user_decrypt() gates every decrypt path
+ *    - No fallback to user ID 1 unless explicitly in privileged admin context
+ *    - Logged-out visitors always receive masked “[LOCKED 🔒]” placeholders
  *
  * 4. RATE LIMITING:
  *    - Login attempts limited to 5 per IP per 5 minutes
@@ -37,8 +37,8 @@
  *    - POST-only endpoints, nonce validation on all AJAX
  *
  * 5. KEY VERSIONING:
- *    - Database supports key_id and active flags for future rotation
- *    - Encrypted blobs can store key_id in metadata for multi-key decrypt
+ *    - Database tracks key_id, created_at, and active flags for each user keypair
+ *    - Every encrypted blob records its key_id to enable future rotation without data loss
  *
  * 6. LOGGING:
  *    - All sensitive data (keys, ciphertext) redacted from error logs
@@ -57,7 +57,7 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 // Plugin version
-define( 'NDK_VERSION', '1.1.0' );
+define( 'NDK_VERSION', '1.2.0' );
 define( 'NDK_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'NDK_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -66,6 +66,10 @@ if ( ! defined( 'NDK_API_KEY' ) || ! defined( 'NDK_LOGIN_KEY_PASSPHRASE' ) ) {
     add_action( 'admin_notices', function() {
         if ( NDK_Security::should_show_migration_notice() ) {
             $instructions = NDK_Security::get_migration_instructions();
+            $migration_url = wp_nonce_url(
+                admin_url( 'admin.php?page=wp-kybercrypt&action=complete_migration' ),
+                'ndk-complete-migration'
+            );
             ?>
             <div class="notice notice-warning is-dismissible">
                 <h3>WP-KyberCrypt Security Migration Required</h3>
@@ -75,7 +79,7 @@ if ( ! defined( 'NDK_API_KEY' ) || ! defined( 'NDK_LOGIN_KEY_PASSPHRASE' ) ) {
 define( '<?php echo esc_html( $inst['constant'] ); ?>', '<?php echo esc_html( $inst['value'] ); ?>' );
 <?php endforeach; ?>
                 </pre>
-                <p>After adding these to wp-config.php, <a href="<?php echo esc_url( admin_url( 'admin.php?page=wp-kybercrypt&action=complete_migration' ) ); ?>">click here to complete migration</a>.</p>
+                <p>After adding these to wp-config.php, <a href="<?php echo esc_url( $migration_url ); ?>">click here to complete migration</a>.</p>
                 <p><em>This removes sensitive data from the database and stores it securely in wp-config.php.</em></p>
             </div>
             <?php
@@ -226,6 +230,15 @@ class WP_KyberCrypt {
 
         require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
         dbDelta( $sql );
+
+        // Backfill key_id for legacy rows
+        $wpdb->query(
+            "UPDATE $table_name SET key_id = CONCAT('user-', user_id, '-legacy') WHERE key_id = '' OR key_id IS NULL"
+        );
+        // Ensure active flag defaults to 1 for legacy records
+        $wpdb->query(
+            "UPDATE $table_name SET active = 1 WHERE active IS NULL"
+        );
     }
 
     /**

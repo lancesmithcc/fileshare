@@ -1,8 +1,8 @@
-# WP-KyberCrypt Security Guide (v1.1.0)
-
+# WP-KyberCrypt Security Guide (v1.2.0)
+#
 ## 🔐 Production Hardening Complete
 
-WP-KyberCrypt v1.1 implements enterprise-grade security controls for quantum-safe WordPress encryption.
+WP-KyberCrypt v1.2 extends the security controls around secret storage, API transport, access control, and login hardening for quantum-safe WordPress encryption.
 
 ## Critical Security Improvements
 
@@ -15,7 +15,7 @@ update_option( 'ndk_api_key', $secret_key );
 update_option( 'ndk_site_login_keys', array( 'passphrase' => $passphrase ) );
 ```
 
-**AFTER (v1.1):** Secrets in wp-config.php constants
+**AFTER (v1.2):** Secrets in wp-config.php constants (never in the database and never sent over HTTP)
 ```php
 // ✅ SECURE - Secrets outside database
 define( 'NDK_API_KEY', 'your_api_key_here' );
@@ -23,31 +23,34 @@ define( 'NDK_LOGIN_KEY_PASSPHRASE', 'your_passphrase_here' );
 define( 'NDK_API_URL', 'https://your-api-endpoint.com' ); // optional
 ```
 
-**Result:** Database dump no longer sufficient to decrypt data or call decrypt service.
+**Result:** Database dump no longer sufficient to decrypt data or call decrypt service, and even intercepted HTTPS requests never contain the site login passphrase.
+
+**No Wire Secrets:** Unlock requests now include only `{ encrypted_private_key, salt, nonce }`. The companion Python service must load `NDK_LOGIN_KEY_PASSPHRASE` from its own environment.
 
 ---
 
 ### 2. Python Service Isolation ✅
 
 **URL Validation Rules:**
-- ✅ `https://any-domain.com` - Allowed (encrypted transport)
-- ✅ `http://localhost` or `http://127.0.0.1` - Allowed (localhost)
-- ✅ `http://10.0.0.5` or `http://192.168.1.100` - Allowed (RFC1918 private IPs)
-- ❌ `http://public-domain.com` - **BLOCKED** (public HTTP)
+- ✅ `https://any-domain.com` – Allowed (encrypted transport)
+- ✅ `http://localhost` / `http://127.0.0.1` / `http://[::1]` – Allowed (loopback only)
+- ✅ `https://10.0.0.5` (or other RFC1918 address over HTTPS)
+- ❌ `http://10.0.0.5` – **BLOCKED** (private HTTP no longer permitted)
+- ❌ `http://public-domain.com` – **BLOCKED** (public HTTP)
 
 **Security Warning:**
-If API URL is not localhost/private, admin sees:
+If API URL is not localhost/private, or if it uses plain HTTP outside loopback, admins see:
 > ⚠️ WARNING: Python Kyber service should be on localhost or private network for security.
 
 **Deployment Recommendation:**
 ```bash
-# Python service on localhost
+# Python service on localhost (loopback HTTP permitted)
 NDK_API_URL=http://127.0.0.1:8000
 
-# Or private network
-NDK_API_URL=http://10.0.1.50:8000
+# Private network or remote host must use HTTPS
+NDK_API_URL=https://10.0.1.50:8000
 
-# Or HTTPS (any domain)
+# Or internal load balancer with TLS
 NDK_API_URL=https://secure-kyber-api.internal
 ```
 
@@ -76,6 +79,8 @@ if ( ! NDK_Security::can_current_user_decrypt( 'woo_order', $order_user_id ) ) {
 }
 // Proceed with decrypt...
 ```
+
+**Masked Output:** Unauthorized users (including anonymous visitors) always see `[LOCKED 🔒]`, so encrypted blobs never leak plaintext even if templates forget to gate output.
 
 ---
 

@@ -72,6 +72,41 @@ def approve_user(user_id: int):
     return redirect(url_for("arch.dashboard"))
 
 
+@arch_bp.post("/users/<int:user_id>/role")
+def update_user_role(user_id: int):
+    member = User.query.get_or_404(user_id)
+    if member.id == current_user.id:
+        flash("You cannot alter your own mantle.", "info")
+        return redirect(url_for("arch.dashboard"))
+
+    role_map = {
+        "member": "a member",
+        "arch": "an arch druid",
+    }
+    new_role = request.form.get("role", "").strip()
+    if new_role not in role_map:
+        flash("Choose a valid role for the circle.", "warning")
+        return redirect(url_for("arch.dashboard"))
+
+    if member.role == new_role:
+        flash(f"{member.username} already serves as {role_map[new_role]}.", "info")
+        return redirect(url_for("arch.dashboard"))
+
+    if member.is_arch and new_role != "arch":
+        remaining_arches = (
+            User.query.filter(User.role == "arch", User.id != member.id).count()
+        )
+        if remaining_arches == 0:
+            flash("At least one arch druid must remain to steward the site.", "warning")
+            return redirect(url_for("arch.dashboard"))
+
+    member.role = new_role
+    db.session.add(member)
+    db.session.commit()
+    flash(f"{member.username} now walks as {role_map[new_role]}.", "success")
+    return redirect(url_for("arch.dashboard"))
+
+
 @arch_bp.post("/users/<int:user_id>/suspend")
 def suspend_user(user_id: int):
     member = User.query.get_or_404(user_id)

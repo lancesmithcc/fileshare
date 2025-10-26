@@ -1,13 +1,26 @@
 (() => {
-  const emojiPickerModal = document.querySelector('[data-emoji-picker-modal]');
-  const emojiPickerOverlay = document.querySelector('[data-emoji-picker-overlay]');
-  const emojiPickerClose = document.querySelector('[data-emoji-picker-close]');
-  const emojiGrid = document.querySelector('[data-emoji-grid]');
-  const emojiSearchInput = document.querySelector('[data-emoji-search-input]');
+  const pickerRegistry = [];
+  const registryMap = new Map();
 
-  if (!emojiPickerModal || !emojiPickerOverlay || !emojiPickerClose || !emojiGrid || !emojiSearchInput) {
+  document.querySelectorAll('[data-emoji-picker-modal]').forEach((modal) => {
+    const overlay = modal.querySelector('[data-emoji-picker-overlay]');
+    const close = modal.querySelector('[data-emoji-picker-close]');
+    const grid = modal.querySelector('[data-emoji-grid]');
+    const search = modal.querySelector('[data-emoji-search-input]');
+    if (!overlay || !close || !grid || !search) {
+      return;
+    }
+    const registry = { modal, overlay, close, grid, search };
+    pickerRegistry.push(registry);
+    registryMap.set(modal, registry);
+  });
+
+  if (!pickerRegistry.length) {
     return;
   }
+
+  let activePicker = null;
+  let currentTextarea = null;
 
   // Comprehensive emoji collection with keywords for search
   const emojis = [
@@ -461,70 +474,117 @@
     { emoji: '⏳', keywords: ['hourglass', 'flowing', 'sand', 'time'] },
   ];
 
-  let currentTextarea = null;
   let allEmojis = [...emojis]; // Keep a copy of all emojis
+
+  function hidePicker(registry) {
+    if (!registry) {
+      return;
+    }
+    registry.modal.style.display = 'none';
+    if (activePicker === registry) {
+      activePicker = null;
+      currentTextarea = null;
+    }
+  }
+
+  function positionPicker(trigger, registry) {
+    const chatWindow = trigger.closest('.chat-window');
+    const tray = trigger.closest('[data-messenger-tray]');
+
+    if (chatWindow && chatWindow.contains(registry.modal)) {
+      registry.modal.classList.add('in-chat');
+      registry.modal.classList.remove('in-popover');
+    } else if (tray) {
+      registry.modal.classList.add('in-popover');
+      registry.modal.classList.remove('in-chat');
+      if (registry.modal.parentElement !== tray) {
+        tray.appendChild(registry.modal);
+      }
+    } else {
+      registry.modal.classList.remove('in-chat');
+      registry.modal.classList.remove('in-popover');
+      if (registry.modal.parentElement !== document.body) {
+        document.body.appendChild(registry.modal);
+      }
+    }
+  }
+
+  function resolvePickerForButton(button) {
+    const chatWindow = button.closest('.chat-window');
+    if (chatWindow) {
+      const modal = chatWindow.querySelector('[data-emoji-picker-modal]');
+      if (modal && registryMap.has(modal)) {
+        return registryMap.get(modal);
+      }
+    }
+
+    // Default to the first registered picker (global modal)
+    return pickerRegistry[0];
+  }
+
+  function openPicker(registry, trigger) {
+    if (!registry) {
+      return;
+    }
+
+    if (activePicker && activePicker !== registry) {
+      hidePicker(activePicker);
+    }
+
+    activePicker = registry;
+    positionPicker(trigger, registry);
+    registry.search.value = '';
+    renderEmojis(allEmojis);
+    registry.modal.style.display = 'block';
+    registry.search.focus();
+  }
+
+  pickerRegistry.forEach((registry) => {
+    registry.overlay.addEventListener('click', () => hidePicker(registry));
+    registry.close.addEventListener('click', () => hidePicker(registry));
+    registry.search.addEventListener('input', () => {
+      if (activePicker !== registry) {
+        return;
+      }
+      const query = registry.search.value.toLowerCase().trim();
+      if (!query) {
+        renderEmojis(allEmojis);
+        return;
+      }
+      const filtered = allEmojis.filter((item) =>
+        item.keywords.some((keyword) => keyword.includes(query))
+      );
+      renderEmojis(filtered);
+    });
+  });
 
   // Use event delegation for dynamically created buttons
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-emoji-picker-btn]');
-    if (btn) {
-      e.preventDefault();
-      // Find the nearest textarea
-      const form = btn.closest('form');
-      currentTextarea = form ? form.querySelector('textarea') : null;
-
-      // Check if button is inside messenger popover
-      const messengerTray = btn.closest('[data-messenger-tray]');
-
-      if (messengerTray) {
-        // Position inside the popover
-        emojiPickerModal.classList.add('in-popover');
-        // Append to messenger tray temporarily
-        messengerTray.appendChild(emojiPickerModal);
-      } else {
-        // Position on page
-        emojiPickerModal.classList.remove('in-popover');
-        // Make sure it's back in the body
-        if (emojiPickerModal.parentElement !== document.body) {
-          document.body.appendChild(emojiPickerModal);
-        }
-      }
-
-      emojiPickerModal.style.display = 'block';
-      emojiSearchInput.value = ''; // Clear search
-      renderEmojis(allEmojis);
-      emojiSearchInput.focus();
+    if (!btn) {
+      return;
     }
-  });
-
-  emojiPickerOverlay.addEventListener('click', () => {
-    emojiPickerModal.style.display = 'none';
-    currentTextarea = null;
-  });
-
-  emojiPickerClose.addEventListener('click', () => {
-    emojiPickerModal.style.display = 'none';
-    currentTextarea = null;
-  });
-
-  // Search functionality
-  emojiSearchInput.addEventListener('input', () => {
-    const query = emojiSearchInput.value.toLowerCase().trim();
-    if (query === '') {
-      renderEmojis(allEmojis);
-    } else {
-      const filtered = allEmojis.filter(item =>
-        item.keywords.some(keyword => keyword.includes(query))
-      );
-      renderEmojis(filtered);
+    e.preventDefault();
+    const form = btn.closest('form');
+    currentTextarea = form ? form.querySelector('textarea') : null;
+    const registry = resolvePickerForButton(btn);
+    if (!registry) {
+      return;
     }
+    openPicker(registry, btn);
   });
 
   function renderEmojis(emojisToRender) {
-    emojiGrid.innerHTML = '';
+    if (!activePicker) {
+      return;
+    }
+
+    const grid = activePicker.grid;
+    grid.innerHTML = '';
 
     if (emojisToRender.length === 0) {
-      emojiGrid.innerHTML = '<p style="grid-column: 1 / -1; text-align: center; color: #888; padding: 2rem;">No emojis found</p>';
+      grid.innerHTML =
+        '<p style="grid-column: 1 / -1; text-align: center; color: #888; padding: 2rem;">No emojis found</p>';
       return;
     }
 
@@ -537,10 +597,10 @@
         if (currentTextarea) {
           currentTextarea.value += item.emoji;
           currentTextarea.focus();
-          emojiPickerModal.style.display = 'none';
+          hidePicker(activePicker);
         }
       });
-      emojiGrid.appendChild(emojiSpan);
+      grid.appendChild(emojiSpan);
     });
   }
 })();

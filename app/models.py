@@ -316,6 +316,27 @@ class ChatMessageKey(db.Model):
         return f"<ChatMessageKey message={self.message_id} user={self.user_id}>"
 
 
+class ChatBlock(db.Model):
+    __tablename__ = "chat_blocks"
+
+    id = db.Column(db.Integer, primary_key=True)
+    blocker_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    blocked_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    blocker = db.relationship("User", foreign_keys=[blocker_id], backref="chat_blocks_initiated")
+    blocked = db.relationship("User", foreign_keys=[blocked_id], backref="chat_blocks_received")
+
+    __table_args__ = (
+        db.UniqueConstraint("blocker_id", "blocked_id", name="uq_chat_block_pair"),
+        db.Index("ix_chat_blocks_blocker", "blocker_id"),
+        db.Index("ix_chat_blocks_blocked", "blocked_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ChatBlock blocker={self.blocker_id} blocked={self.blocked_id}>"
+
+
 class FileFolder(db.Model):
     __tablename__ = "file_folders"
 

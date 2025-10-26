@@ -16,6 +16,9 @@ This plugin integrates with the Neo-Druidic Society's Kyber API to provide enter
 - **WordPress Best Practices**: Follows all WordPress coding standards
 - **Secure by Design**: Private keys encrypted with user credentials
 - **Shortcode Support**: `[ndk_encrypted]` for inline encrypted content
+- **Role-Aware Decryption**: Central capability helper prevents unauthorized plaintext leaks
+- **Login Hardening**: Quantum login endpoint now rate limited with uniform error responses
+- **Key Rotation Ready**: Every encrypted blob records the `key_id` used so future rotations stay decryptable
 
 ### Security Level
 
@@ -44,10 +47,16 @@ This plugin integrates with the Neo-Druidic Society's Kyber API to provide enter
 
 ### 1. API Setup
 
-1. Navigate to **Kyber Encryption > Settings** in WordPress admin
-2. Enter your Neo-Druidic API URL (default: `https://awen01.cc`)
-3. (Optional) Add your API key if authentication is required
-4. Click "Test Connection" to verify setup
+1. Ensure your Python Kyber microservice runs on **localhost or a private RFC1918 network**. HTTP transport is only allowed for `127.0.0.1` / `::1`; everything else must use HTTPS.
+2. Define your secrets in `wp-config.php` (the plugin no longer loads them from the database):
+
+```php
+define( 'NDK_API_URL', 'https://127.0.0.1' );
+define( 'NDK_API_KEY', 'your-long-api-key' );
+define( 'NDK_LOGIN_KEY_PASSPHRASE', 'super-secret-passphrase' );
+```
+
+3. Visit **Kyber Encryption > Settings** in the WordPress admin to verify the connection and confirm that secrets are detected.
 
 ### 2. Enable Encryption
 
@@ -112,13 +121,17 @@ The plugin creates one table: `wp_ndk_keys`
 CREATE TABLE wp_ndk_keys (
     id bigint(20) AUTO_INCREMENT PRIMARY KEY,
     user_id bigint(20) NOT NULL,
+    key_id varchar(100) NOT NULL,
     public_key text NOT NULL,
     encrypted_private_key text NOT NULL,
     salt varchar(255) NOT NULL,
     nonce varchar(255) NOT NULL,
+    active tinyint(1) DEFAULT 1,
     created_at datetime DEFAULT CURRENT_TIMESTAMP,
     updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    KEY user_id (user_id)
+    UNIQUE KEY user_key_id (user_id, key_id),
+    KEY user_id (user_id),
+    KEY active (active)
 );
 ```
 
@@ -130,14 +143,16 @@ CREATE TABLE wp_ndk_keys (
 - Keys are stored in the database with **AES-256 encryption**
 - Each user has a unique keypair
 - Lost passphrases = lost access to encrypted content (by design)
+- Site login keys are wrapped with `NDK_LOGIN_KEY_PASSPHRASE`, which lives only in `wp-config.php` and is never transmitted over HTTP
 
 ### Best Practices
 
 1. **Backup Regularly**: Encrypted content cannot be recovered without keys
 2. **Strong Passwords**: User passwords secure their private keys
-3. **HTTPS Required**: Always use SSL/TLS for API communication
-4. **API Key**: Use API key authentication in production
-5. **Test First**: Test encryption on non-production content first
+3. **Run Kyber locally**: Host the Python microservice on localhost or a private LAN—never expose it publicly
+4. **HTTPS Required**: Always use SSL/TLS for remote API communication
+5. **API Key**: Define `NDK_API_KEY` in `wp-config.php` for production-grade authentication
+6. **Test First**: Test encryption on non-production content first
 
 ## Requirements
 
@@ -169,6 +184,14 @@ The encryption happens server-side via API calls. Performance impact depends on 
 Yes! The plugin is designed to work with any compatible ML-KEM-768 API endpoint. Simply point the API URL to your own instance.
 
 ## Changelog
+
+### 1.2.0 (2024-11-05)
+- Enforced storage of `NDK_API_KEY` and `NDK_LOGIN_KEY_PASSPHRASE` in `wp-config.php` only
+- Locked the Kyber microservice to localhost/private networks with mandatory HTTPS for public hosts
+- Added the `CanCurrentUserDecrypt()` gate to every decrypt path and masked unauthorized output
+- Hardened the quantum login AJAX endpoint with POST validation, IP throttling, and generic errors
+- Introduced `key_id` tracking on keypairs and encrypted blobs to prepare for seamless rotation
+- Removed legacy secret echoes from admin notices and logs
 
 ### 1.0.0 (2024-10-24)
 - Initial release

@@ -143,14 +143,24 @@
       event.preventDefault();
       const threadId = parseInt(deleteButton.dataset.threadId || '', 10);
       const messageId = parseInt(deleteButton.dataset.messageId || '', 10);
+      const isGroup = deleteButton.dataset.isGroup === '1';
       if (Number.isNaN(threadId) || Number.isNaN(messageId)) {
         return;
       }
-      if (!window.confirm('Delete this message?')) {
-        return;
+
+      let deleteScope = 'all';
+      if (!isGroup) {
+        // For one-on-one chats, ask user if they want to delete for self or both
+        const choice = window.confirm('Delete for both users?\n\nOK = Delete for both\nCancel = Delete for me only');
+        deleteScope = choice ? 'all' : 'self';
+      } else {
+        if (!window.confirm('Delete this message?')) {
+          return;
+        }
       }
+
       deleteButton.disabled = true;
-      deleteMessage(threadId, messageId).finally(() => {
+      deleteMessage(threadId, messageId, deleteScope).finally(() => {
         deleteButton.disabled = false;
       });
       return;
@@ -178,14 +188,24 @@
       event.preventDefault();
       const threadId = currentThreadId != null ? currentThreadId : parseInt(deleteButton.dataset.threadId || '', 10);
       const messageId = parseInt(deleteButton.dataset.messageId || '', 10);
+      const isGroup = deleteButton.dataset.isGroup === '1';
       if (Number.isNaN(threadId) || Number.isNaN(messageId)) {
         return;
       }
-      if (!window.confirm('Delete this message?')) {
-        return;
+
+      let deleteScope = 'all';
+      if (!isGroup) {
+        // For one-on-one chats, ask user if they want to delete for self or both
+        const choice = window.confirm('Delete for both users?\n\nOK = Delete for both\nCancel = Delete for me only');
+        deleteScope = choice ? 'all' : 'self';
+      } else {
+        if (!window.confirm('Delete this message?')) {
+          return;
+        }
       }
+
       deleteButton.disabled = true;
-      deleteMessage(threadId, messageId).finally(() => {
+      deleteMessage(threadId, messageId, deleteScope).finally(() => {
         deleteButton.disabled = false;
       });
     });
@@ -223,7 +243,12 @@
     if (!messengerTray.classList.contains('is-open')) {
       return;
     }
-    if (event.target.closest('[data-messenger-dock]') || event.target.closest('[data-messenger-tray]')) {
+    const path = typeof event.composedPath === 'function' ? event.composedPath() : null;
+    if (
+      (path && (path.includes(messengerDock) || path.includes(messengerTray))) ||
+      event.target.closest('[data-messenger-dock]') ||
+      event.target.closest('[data-messenger-tray]')
+    ) {
       return;
     }
     messengerTray.classList.remove('is-open');
@@ -236,6 +261,49 @@
   });
 
   document.addEventListener('click', (event) => {
+    const blockButton = event.target.closest('[data-block-user]');
+    if (blockButton) {
+      event.preventDefault();
+      const userId = parseInt(blockButton.dataset.userId || '', 10);
+      if (Number.isNaN(userId)) {
+        return;
+      }
+      if (!window.confirm('Block this user? You will not be able to message each other.')) {
+        return;
+      }
+      blockUser(userId);
+      return;
+    }
+
+    const unblockButton = event.target.closest('[data-unblock-user]');
+    if (unblockButton) {
+      event.preventDefault();
+      const userId = parseInt(unblockButton.dataset.userId || '', 10);
+      if (Number.isNaN(userId)) {
+        return;
+      }
+      if (!window.confirm('Unblock this user?')) {
+        return;
+      }
+      unblockUser(userId);
+      return;
+    }
+
+    const kickButton = event.target.closest('[data-kick-member]');
+    if (kickButton) {
+      event.preventDefault();
+      const threadId = parseInt(kickButton.dataset.threadId || '', 10);
+      const userId = parseInt(kickButton.dataset.userId || '', 10);
+      if (Number.isNaN(threadId) || Number.isNaN(userId)) {
+        return;
+      }
+      if (!window.confirm('Remove this member from the group?')) {
+        return;
+      }
+      kickMember(threadId, userId);
+      return;
+    }
+
     const actionButton = event.target.closest('[data-thread-action]');
     if (!actionButton) {
       return;
@@ -389,7 +457,7 @@
 
       const allOption = document.createElement('option');
       allOption.value = 'all';
-      allOption.textContent = 'All circles';
+      allOption.textContent = 'all one circles';
       if (selectedCircle === 'all') {
         allOption.selected = true;
       }
@@ -411,11 +479,11 @@
         select.append(option);
       });
 
-      const includesUnaffiliated = onlineCircles.some((circle) => circle.id === 'unaffiliated');
-      if (!includesUnaffiliated && onlineUsers.some((user) => !user.circle)) {
+      const includesunaffiliated = onlineCircles.some((circle) => circle.id === 'unaffiliated');
+      if (!includesunaffiliated && onlineUsers.some((user) => !user.circle)) {
         const option = document.createElement('option');
         option.value = 'unaffiliated';
-        option.textContent = 'Unaffiliated';
+        option.textContent = 'unaffiliated';
         if (selectedCircle === 'unaffiliated') {
           option.selected = true;
         }
@@ -446,6 +514,10 @@
       } else {
         resetGroupBuilderState();
         groupBuilderOpen = true;
+        // Fetch all recipients to enable adding offline users
+        if (!allRecipients.length && offlineFetchState !== 'loading') {
+          fetchRecipients();
+        }
       }
       renderTray();
     });
@@ -699,7 +771,7 @@
       if (isOffline) {
         meta.textContent = user.circle ? `${user.circle.name} · offline` : 'Offline';
       } else {
-        meta.textContent = user.circle ? user.circle.name : 'Unaffiliated';
+        meta.textContent = user.circle ? user.circle.name : 'unaffiliated';
       }
     } else {
       meta.textContent = 'Whispers locked';
@@ -737,14 +809,19 @@
 
     const hint = document.createElement('p');
     hint.className = 'messenger-group-hint';
-    hint.textContent = 'Invite members to start a shared whisper.';
+    hint.textContent = 'Invite members to start a shared whisper (online and offline).';
     form.append(hint);
 
     const membersWrap = document.createElement('div');
     membersWrap.className = 'messenger-group-members';
 
+    // Combine online and offline users for group creation
+    const onlineIds = new Set(onlineUsers.map(u => u.id));
+    const offlineFiltered = allRecipients.filter(u => !onlineIds.has(u.id));
+    const allAvailableUsers = [...visibleUsers, ...offlineFiltered];
+
     let selectableCount = 0;
-    visibleUsers.forEach((user) => {
+    allAvailableUsers.forEach((user) => {
       const entry = document.createElement('label');
       entry.className = 'messenger-group-member';
 
@@ -777,7 +854,9 @@
 
       const descriptor = document.createElement('span');
       descriptor.className = 'messenger-group-member-label';
-      descriptor.textContent = user.username + (user.circle ? ` · ${user.circle.name}` : ' · Unaffiliated');
+      const circleText = user.circle ? ` · ${user.circle.name}` : ' · unaffiliated';
+      const onlineStatus = onlineIds.has(user.id) ? '' : ' (offline)';
+      descriptor.textContent = user.username + circleText + onlineStatus;
       entry.append(descriptor);
 
       if (!checkbox.disabled) {
@@ -1226,15 +1305,89 @@
     }
   }
 
-  async function deleteMessage(threadId, messageId) {
+  async function blockUser(userId) {
+    if (!userId) {
+      return;
+    }
+    try {
+      const response = await fetch(`/chat/block/${userId}`, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        const error = (result && result.error) || 'Unable to block that user.';
+        window.alert(error);
+        return;
+      }
+      window.location.reload();
+    } catch (err) {
+      console.error('[chat] block user failed', err);
+      window.alert('Unable to block that user.');
+    }
+  }
+
+  async function unblockUser(userId) {
+    if (!userId) {
+      return;
+    }
+    try {
+      const response = await fetch(`/chat/unblock/${userId}`, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        const error = (result && result.error) || 'Unable to unblock that user.';
+        window.alert(error);
+        return;
+      }
+      window.location.reload();
+    } catch (err) {
+      console.error('[chat] unblock user failed', err);
+      window.alert('Unable to unblock that user.');
+    }
+  }
+
+  async function kickMember(threadId, userId) {
+    if (!threadId || !userId) {
+      return;
+    }
+    try {
+      const response = await fetch(`/chat/threads/${threadId}/kick/${userId}`, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        const error = (result && result.error) || 'Unable to remove that member.';
+        window.alert(error);
+        return;
+      }
+      // Reload the page to reflect the change
+      window.location.reload();
+    } catch (err) {
+      console.error('[chat] kick member failed', err);
+      window.alert('Unable to remove that member.');
+    }
+  }
+
+  async function deleteMessage(threadId, messageId, scope = 'all') {
     if (!threadId || !messageId) {
       return;
     }
     try {
+      const payload = new URLSearchParams();
+      payload.append('scope', scope);
+
       const response = await fetch(`/chat/messages/${messageId}/delete`, {
         method: 'POST',
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'same-origin',
+        body: payload,
       });
       if (!response.ok) {
         const result = await response.json().catch(() => null);
@@ -1243,6 +1396,20 @@
           setTrayNotice(error, 'danger', true);
         } else {
           window.alert(error);
+        }
+        return;
+      }
+
+      const result = await response.json().catch(() => null);
+      if (result && result.scope === 'self') {
+        // For "delete for self", just hide the message locally
+        const messageEl = messageList?.querySelector(`[data-message-id="${messageId}"]`);
+        if (messageEl) {
+          messageEl.remove();
+        }
+        const popoverMessageEl = document.querySelector(`.chat-popover[data-chat-window="${threadId}"] [data-message-id="${messageId}"]`);
+        if (popoverMessageEl) {
+          popoverMessageEl.remove();
         }
       }
     } catch (err) {
@@ -1374,6 +1541,7 @@
     container.className = 'chat-popover';
     container.dataset.chatWindow = String(threadId);
     container.innerHTML = `
+      <div class="chat-popover-resize-handle" data-resize-handle></div>
       <header class="chat-popover-header">
         <span class="chat-popover-title">${label || 'Conversation'}</span>
         <button type="button" class="chat-popover-close" aria-label="Close">×</button>
@@ -1407,8 +1575,45 @@
     if (info.form) {
       attachComposeShortcuts(info.form);
     }
+
+    // Add resize functionality
+    const resizeHandle = container.querySelector('[data-resize-handle]');
+    if (resizeHandle) {
+      attachResizeHandler(container, resizeHandle);
+    }
+
     windowMap.set(threadId, info);
     return info;
+  }
+
+  function attachResizeHandler(container, handle) {
+    let isResizing = false;
+    let startY = 0;
+    let startHeight = 0;
+
+    handle.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      startY = e.clientY;
+      startHeight = container.offsetHeight;
+      e.preventDefault();
+      document.body.style.userSelect = 'none';
+      container.classList.add('is-resizing');
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      const deltaY = startY - e.clientY;
+      const newHeight = Math.max(300, Math.min(800, startHeight + deltaY));
+      container.style.height = `${newHeight}px`;
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isResizing) {
+        isResizing = false;
+        document.body.style.userSelect = '';
+        container.classList.remove('is-resizing');
+      }
+    });
   }
 
   function highlightDock(threadId, label, message) {

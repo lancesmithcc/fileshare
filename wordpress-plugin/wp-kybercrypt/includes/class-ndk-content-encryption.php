@@ -226,14 +226,18 @@ class NDK_Content_Encryption {
             return ob_get_clean();
         }
 
+        if ( ! NDK_Security::can_current_user_decrypt( 'post_content', (int) $post->post_author ) ) {
+            return '<p class="ndk-error">' . esc_html( NDK_Security::get_masked_value() ) . '</p>';
+        }
+
         $encrypted_data = get_post_meta( $post->ID, '_ndk_encrypted_data', true );
 
         if ( ! $encrypted_data ) {
             return '<p class="ndk-error">' . __( '[Encrypted content not available]', 'wp-kybercrypt' ) . '</p>';
         }
 
-        $user_id = get_current_user_id();
-        $decrypted = NDK_Encryption::decrypt_content( $encrypted_data, $user_id );
+        $owner_id = (int) $post->post_author;
+        $decrypted = NDK_Encryption::decrypt_content( $encrypted_data, $owner_id );
 
         if ( ! $decrypted ) {
             return '<p class="ndk-error">' . __( '[Unable to decrypt content - you may not have permission]', 'wp-kybercrypt' ) . '</p>';
@@ -277,8 +281,12 @@ class NDK_Content_Encryption {
             return __( '[Encrypted comment]', 'wp-kybercrypt' );
         }
 
-        $user_id = get_current_user_id();
-        $decrypted = NDK_Encryption::decrypt_content( $encrypted_data, $user_id );
+        if ( ! NDK_Security::can_current_user_decrypt( 'comment', (int) $comment->user_id ) ) {
+            return NDK_Security::get_masked_value();
+        }
+
+        $owner_id = (int) $comment->user_id;
+        $decrypted = NDK_Encryption::decrypt_content( $encrypted_data, $owner_id );
 
         return $decrypted ? $decrypted : __( '[Unable to decrypt comment]', 'wp-kybercrypt' );
     }
@@ -367,6 +375,10 @@ class NDK_Content_Encryption {
 
         $user_id = get_current_user_id();
 
+        if ( ! NDK_Security::can_current_user_decrypt( 'post_content', $user_id ) ) {
+            return '<p class="ndk-encrypted-shortcode">' . esc_html( NDK_Security::get_masked_value() ) . '</p>';
+        }
+
         // Try to decrypt if already encrypted
         if ( strpos( $content, '[NDK_ENCRYPTED:' ) === 0 ) {
             // Extract encrypted data from shortcode
@@ -420,6 +432,9 @@ class NDK_Content_Encryption {
      */
     public function decrypt_user_metadata( $value, $object_id, $meta_key, $single ) {
         if ( is_string( $value ) && strpos( $value, '[NDK_ENCRYPTED]' ) === 0 ) {
+            if ( ! NDK_Security::can_current_user_decrypt( 'user_meta', (int) $object_id ) ) {
+                return NDK_Security::get_masked_value();
+            }
             $encrypted_data = json_decode( base64_decode( substr( $value, 15 ) ), true );
             $decrypted = NDK_Encryption::decrypt_content( $encrypted_data, $object_id );
             return $decrypted ? $decrypted : $value;
@@ -461,12 +476,19 @@ class NDK_Content_Encryption {
      */
     public function decrypt_sensitive_options( $value, $option ) {
         if ( is_string( $value ) && strpos( $value, '[NDK_ENCRYPTED]' ) === 0 ) {
+            if ( ! NDK_Security::can_current_user_decrypt( 'options', 1 ) ) {
+                return NDK_Security::get_masked_value();
+            }
             $encrypted_data = json_decode( base64_decode( substr( $value, 15 ) ), true );
             $decrypted = NDK_Encryption::decrypt_content( $encrypted_data, 1 );
             return $decrypted ? $decrypted : $value;
         } elseif ( is_array( $value ) ) {
             array_walk_recursive( $value, function( &$item ) {
                 if ( is_string( $item ) && strpos( $item, '[NDK_ENCRYPTED]' ) === 0 ) {
+                    if ( ! NDK_Security::can_current_user_decrypt( 'options', 1 ) ) {
+                        $item = NDK_Security::get_masked_value();
+                        return;
+                    }
                     $encrypted_data = json_decode( base64_decode( substr( $item, 15 ) ), true );
                     $decrypted = NDK_Encryption::decrypt_content( $encrypted_data, 1 );
                     $item = $decrypted ? $decrypted : $item;
@@ -496,6 +518,12 @@ class NDK_Content_Encryption {
     public function decrypt_attachment_metadata( $data, $attachment_id ) {
         if ( is_array( $data ) && isset( $data['_ndk_encrypted'] ) ) {
             $author_id = get_post_field( 'post_author', $attachment_id );
+            if ( ! NDK_Security::can_current_user_decrypt( 'attachment', (int) $author_id ) ) {
+                return array(
+                    '_ndk_locked' => true,
+                    'message'     => NDK_Security::get_masked_value(),
+                );
+            }
             $encrypted_data = json_decode( base64_decode( $data['_ndk_encrypted'] ), true );
             $decrypted = NDK_Encryption::decrypt_content( $encrypted_data, $author_id );
             return $decrypted ? json_decode( $decrypted, true ) : $data;
@@ -539,9 +567,13 @@ class NDK_Content_Encryption {
      */
     public function decrypt_order_field( $value, $order ) {
         if ( is_string( $value ) && strpos( $value, '[NDK_ENCRYPTED]' ) === 0 ) {
-            $customer_id = $order->get_customer_id() ?: 1;
+            $customer_id = (int) $order->get_customer_id();
+            if ( ! NDK_Security::can_current_user_decrypt( 'woo_order', $customer_id ) ) {
+                return NDK_Security::get_masked_value();
+            }
+            $key_holder = $customer_id ?: 1;
             $encrypted_data = json_decode( base64_decode( substr( $value, 15 ) ), true );
-            $decrypted = NDK_Encryption::decrypt_content( $encrypted_data, $customer_id );
+            $decrypted = NDK_Encryption::decrypt_content( $encrypted_data, $key_holder );
             return $decrypted ? $decrypted : $value;
         }
         return $value;
@@ -645,9 +677,13 @@ class NDK_Content_Encryption {
      */
     public function decrypt_gravity_forms_field( $value, $entry, $field, $input_id ) {
         if ( is_string( $value ) && strpos( $value, '[NDK_ENCRYPTED]' ) === 0 ) {
-            $user_id = ! empty( $entry['created_by'] ) ? $entry['created_by'] : 1;
+            $owner_id = ! empty( $entry['created_by'] ) ? (int) $entry['created_by'] : 0;
+            if ( ! NDK_Security::can_current_user_decrypt( 'gravity_forms', $owner_id ) ) {
+                return NDK_Security::get_masked_value();
+            }
+            $key_holder = $owner_id ?: 1;
             $encrypted_data = json_decode( base64_decode( substr( $value, 15 ) ), true );
-            $decrypted = NDK_Encryption::decrypt_content( $encrypted_data, $user_id );
+            $decrypted = NDK_Encryption::decrypt_content( $encrypted_data, $key_holder );
             return $decrypted ? $decrypted : $value;
         }
         return $value;

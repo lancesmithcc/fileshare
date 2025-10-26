@@ -32,14 +32,14 @@ class NDK_API_Client {
         // Validate API URL for security
         $validation = NDK_Security::validate_api_url( $this->api_url );
         if ( ! $validation['valid'] ) {
-            error_log( 'WP-KyberCrypt API URL validation failed: ' . $validation['error'] );
+            error_log( 'WP-KyberCrypt API URL validation failed: ' . NDK_Security::sanitize_log( $validation['error'] ) );
             add_action( 'admin_notices', function() use ( $validation ) {
                 echo '<div class="notice notice-error"><p><strong>WP-KyberCrypt Security Warning:</strong> ' . esc_html( $validation['error'] ) . '</p></div>';
             } );
         } elseif ( isset( $validation['warning'] ) ) {
-            error_log( 'WP-KyberCrypt API URL warning: ' . $validation['warning'] );
+            error_log( 'WP-KyberCrypt API URL warning: ' . NDK_Security::sanitize_log( $validation['warning'] ) );
             add_action( 'admin_notices', function() use ( $validation ) {
-                echo '<div class="notice notice-warning"><p><strong>WP-KyberCrypt Security Notice:</strong> ' . esc_html( $validation['warning'] ) . '</p></div>';
+                echo '<div class="notice notice-warning"><p><strong>WP-KyberCrypt Security Notice:</strong> ' . esc_html( $validation['warning'] ) . ' This Kyber microservice must stay on localhost or your private LAN.</p></div>';
             } );
         }
     }
@@ -51,6 +51,7 @@ class NDK_API_Client {
         // Validate URL before making request
         $validation = NDK_Security::validate_api_url( $this->api_url );
         if ( ! $validation['valid'] ) {
+            error_log( 'WP-KyberCrypt blocked API call: ' . NDK_Security::sanitize_log( $validation['error'] ) );
             return array(
                 'success' => false,
                 'error'   => 'API URL validation failed: ' . $validation['error'],
@@ -62,9 +63,11 @@ class NDK_API_Client {
         $args = array(
             'method'  => $method,
             'headers' => array(
-                'Content-Type' => 'application/json',
+                'Content-Type'  => 'application/json',
+                'X-WP-Kyber-Version' => defined( 'NDK_VERSION' ) ? NDK_VERSION : 'unknown',
             ),
             'timeout' => 30,
+            'sslverify' => true,
         );
 
         // Add API key if configured
@@ -131,9 +134,8 @@ class NDK_API_Client {
     /**
      * Unlock private key
      *
-     * SECURITY NOTE: Passphrase should NOT be sent over HTTP.
-     * This method should be updated to send only encrypted_private_key, salt, nonce
-     * and the Python service should get passphrase from its own environment.
+     * SECURITY NOTE: Site login passphrases are never transmitted.
+     * User-specific unlocks may still supply a derived passphrase when required.
      */
     public function unlock_keypair( $encrypted_private_key, $salt, $nonce, $passphrase = null ) {
         $data = array(

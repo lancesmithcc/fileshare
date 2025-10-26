@@ -65,6 +65,37 @@ class NDK_Security {
     }
 
     /**
+     * Normalize host string for comparisons
+     *
+     * @param string $host Raw host
+     * @return string
+     */
+    private static function normalize_host( $host ) {
+        if ( empty( $host ) ) {
+            return '';
+        }
+
+        $host = strtolower( trim( $host ) );
+
+        if ( substr( $host, 0, 1 ) === '[' && substr( $host, -1 ) === ']' ) {
+            $host = substr( $host, 1, -1 );
+        }
+
+        return $host;
+    }
+
+    /**
+     * Determine if host refers to local loopback
+     *
+     * @param string $host Host string
+     * @return bool
+     */
+    private static function is_loopback_host( $host ) {
+        $host = self::normalize_host( $host );
+        return in_array( $host, array( '127.0.0.1', 'localhost', '::1' ), true );
+    }
+
+    /**
      * Validate API URL for security
      *
      * @param string $url The API URL to validate
@@ -74,41 +105,35 @@ class NDK_Security {
         if ( empty( $url ) ) {
             return array(
                 'valid' => false,
-                'error' => 'API URL cannot be empty',
+                'error' => 'API URL cannot be empty.',
             );
         }
 
         $parsed = parse_url( $url );
 
-        if ( ! $parsed || ! isset( $parsed['scheme'] ) || ! isset( $parsed['host'] ) ) {
+        if ( ! $parsed || empty( $parsed['scheme'] ) || empty( $parsed['host'] ) ) {
             return array(
                 'valid' => false,
-                'error' => 'Invalid URL format',
+                'error' => 'Invalid API URL format.',
             );
         }
 
-        $scheme = $parsed['scheme'];
-        $host   = $parsed['host'];
+        $scheme      = strtolower( $parsed['scheme'] );
+        $host        = self::normalize_host( $parsed['host'] );
+        $is_loopback = self::is_loopback_host( $host );
+        $is_private  = self::is_private_ip( $host );
 
-        // Check if it's localhost
-        $is_localhost = in_array( $host, array( '127.0.0.1', 'localhost', '::1', '[::1]' ), true );
-
-        // Check if it's a private IP (RFC1918)
-        $is_private_ip = self::is_private_ip( $host );
-
-        // If not localhost/private, must be HTTPS
-        if ( ! $is_localhost && ! $is_private_ip && $scheme !== 'https' ) {
+        if ( 'http' === $scheme && ! $is_loopback ) {
             return array(
                 'valid' => false,
-                'error' => 'Public API URLs must use HTTPS. Only localhost and private IPs can use HTTP.',
+                'error' => 'HTTP transport is only permitted for localhost (127.0.0.1 / ::1). Use HTTPS for remote Kyber services.',
             );
         }
 
-        // Warn if not localhost/private
-        if ( ! $is_localhost && ! $is_private_ip ) {
+        if ( ! $is_loopback && ! $is_private ) {
             return array(
                 'valid'   => true,
-                'warning' => 'WARNING: Python Kyber service should be on localhost or private network for security.',
+                'warning' => 'Kyber microservice MUST run on localhost or a private RFC1918 network. Public endpoints are unsafe.',
             );
         }
 
@@ -122,16 +147,23 @@ class NDK_Security {
      * @return bool
      */
     private static function is_private_ip( $ip ) {
-        // Get IP if hostname provided
+        $ip = self::normalize_host( $ip );
+
+        if ( empty( $ip ) ) {
+            return false;
+        }
+
         if ( ! filter_var( $ip, FILTER_VALIDATE_IP ) ) {
-            $ip = gethostbyname( $ip );
+            $resolved = gethostbyname( $ip );
+            if ( $resolved && $resolved !== $ip ) {
+                $ip = $resolved;
+            }
         }
 
         if ( ! filter_var( $ip, FILTER_VALIDATE_IP ) ) {
             return false;
         }
 
-        // Check if it's a private IP
         return ! filter_var(
             $ip,
             FILTER_VALIDATE_IP,
@@ -190,13 +222,11 @@ class NDK_Security {
      * @return string
      */
     public static function get_api_key() {
-        // Prefer constant from wp-config.php
         if ( defined( 'NDK_API_KEY' ) && NDK_API_KEY ) {
             return NDK_API_KEY;
         }
 
-        // Fallback to option for backward compatibility
-        return get_option( 'ndk_api_key', '' );
+        return '';
     }
 
     /**
@@ -220,15 +250,8 @@ class NDK_Security {
      * @return string|null
      */
     public static function get_login_key_passphrase() {
-        // Prefer constant from wp-config.php
         if ( defined( 'NDK_LOGIN_KEY_PASSPHRASE' ) && NDK_LOGIN_KEY_PASSPHRASE ) {
             return NDK_LOGIN_KEY_PASSPHRASE;
-        }
-
-        // Fallback to option for backward compatibility
-        $site_keys = get_option( 'ndk_site_login_keys' );
-        if ( $site_keys && isset( $site_keys['passphrase'] ) ) {
-            return $site_keys['passphrase'];
         }
 
         return null;
@@ -257,11 +280,11 @@ class NDK_Security {
             return false;
         }
 
-        // Check if sensitive data exists in options
         $api_key   = get_option( 'ndk_api_key' );
         $site_keys = get_option( 'ndk_site_login_keys' );
+        $pass_in_db = ( $site_keys && isset( $site_keys['passphrase'] ) && ! empty( $site_keys['passphrase'] ) );
 
-        return ( ! empty( $api_key ) || ( $site_keys && isset( $site_keys['passphrase'] ) ) );
+        return ( ! empty( $api_key ) || $pass_in_db );
     }
 
     /**
@@ -281,7 +304,7 @@ class NDK_Security {
             );
         }
 
-        if ( $site_keys && isset( $site_keys['passphrase'] ) ) {
+        if ( $site_keys && isset( $site_keys['passphrase'] ) && ! empty( $site_keys['passphrase'] ) ) {
             $instructions[] = array(
                 'constant' => 'NDK_LOGIN_KEY_PASSPHRASE',
                 'value'    => $site_keys['passphrase'],

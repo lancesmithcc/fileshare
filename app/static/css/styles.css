@@ -41,7 +41,7 @@ body {
   overflow-x: hidden;
   text-transform: lowercase !important;
 }
-
+*{text-transform: lowercase !important;}
 body.nav-is-open {
   overflow: hidden;
 }
@@ -1013,6 +1013,21 @@ img {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.65rem;
+}
+
+.arch-role-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.arch-role-form select {
+  min-width: 130px;
+}
+
+.arch-role-note {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.65);
 }
 
 .arch-suspend-form {
@@ -2416,12 +2431,15 @@ img {
   gap: 0.6rem;
   padding: 0.75rem 1.2rem;
   background: var(--card-bg);
+  backdrop-filter: blur(20px) brightness(1.2);  /* <-- blur behind */
+  -webkit-backdrop-filter: blur(20px) brightness(1.2);
   border: 1px solid var(--border);
   border-radius: 28px;
   cursor: pointer;
   transition: all 0.2s ease;
   z-index: 1000;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  
 }
 
 .messenger-dock:hover {
@@ -4199,4 +4217,182 @@ body.auth-login .nav {
     font-size: 14px;
   }
 }
+}
+
+/* Chat window pickers - contained within chat interface */
+.chat-window {
+  position: relative; /* Needed for absolute positioning of pickers */
+}
+
+.emoji-picker-modal.in-chat,
+.gif-picker-modal.in-chat {
+  position: absolute;
+  bottom: 80px;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  animation: modal-fade-in 0.2s ease-out;
+}
+
+.emoji-picker-modal.in-chat .emoji-picker-overlay,
+.gif-picker-modal.in-chat .gif-picker-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 99;
+}
+
+.emoji-picker-modal.in-chat .emoji-picker-content,
+.gif-picker-modal.in-chat .gif-picker-content {
+  position: relative;
+  width: calc(100% - 40px);
+  max-width: 500px;
+  margin: 0 auto;
+  z-index: 101;
+}
+
+@media (max-width: 768px) {
+  .emoji-picker-modal.in-chat,
+  .gif-picker-modal.in-chat {
+    bottom: 70px;
+    left: 10px;
+    right: 10px;
+  }
+
+  .emoji-picker-modal.in-chat .emoji-picker-content,
+  .gif-picker-modal.in-chat .gif-picker-content {
+    width: 100%;
+  }
+}
+
+/* Chat member kick button */
+.chat-member-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chat-member-kick {
+  background: rgba(255, 69, 58, 0.2);
+  border: 1px solid rgba(255, 69, 58, 0.4);
+  color: #ff453a;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  opacity: 0.7;
+}
+
+.chat-member-kick:hover {
+  background: rgba(255, 69, 58, 0.3);
+  border-color: rgba(255, 69, 58, 0.6);
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Chat window resize handle */
+.chat-popover-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: ns-resize;
+  background: transparent;
+  z-index: 10;
+  transition: background 0.2s ease;
+}
+
+.chat-popover-resize-handle::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+}
+
+.chat-popover-resize-handle:hover {
+  background: rgba(114, 213, 114, 0.1);
+}
+
+.chat-popover-resize-handle:hover::before {
+  background: rgba(114, 213, 114, 0.6);
+}
+
+.chat-popover.is-resizing {
+  transition: none;
+  pointer-events: none;
+}
+
+.chat-popover.is-resizing .chat-popover-resize-handle {
+  pointer-events: all;
+}
+
+/* Main chat window resize handle */
+.chat-window-resize-handle {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: ns-resize;
+  background: transparent;
+  z-index: 10;
+  transition: background 0.2s ease;
+}
+
+.chat-window-resize-handle::before {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+}
+
+.chat-window-resize-handle:hover {
+  background: rgba(114, 213, 114, 0.1);
+}
+
+.chat-window-resize-handle:hover::before {
+  background: rgba(114, 213, 114, 0.6);
+}
+
+.chat-window.is-resizing {
+  transition: none;
+  user-select: none;
+}
+
+/* Make chat UI less transparent */
+.chat-window,
+.chat-message-list {
+  background: rgba(18, 24, 30, 0.95) !important;
+  backdrop-filter: blur(10px);
+}
+
+.chat-popover {
+  background: rgba(18, 24, 30, 0.95) !important;
+  backdrop-filter: blur(10px);
+}
+
+.chat-popover-body {
+  background: rgba(18, 24, 30, 0.98) !important;
 }

@@ -102,10 +102,17 @@ class NDK_Admin {
             return;
         }
 
+        if ( isset( $_GET['action'] ) && $_GET['action'] === 'complete_migration' ) {
+            if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'ndk-complete-migration' ) ) {
+                wp_die( esc_html__( 'Security check failed.', 'wp-kybercrypt' ) );
+            }
+            NDK_Security::complete_migration();
+            echo '<div class="notice notice-success"><p>' . esc_html__( 'Sensitive secrets were removed from the database.', 'wp-kybercrypt' ) . '</p></div>';
+        }
+
         // Handle form submission
         if ( isset( $_POST['ndk_save_settings'] ) && check_admin_referer( 'ndk-save-settings' ) ) {
             update_option( 'ndk_api_url', esc_url_raw( $_POST['ndk_api_url'] ) );
-            update_option( 'ndk_api_key', sanitize_text_field( $_POST['ndk_api_key'] ) );
             update_option( 'ndk_encrypt_posts', isset( $_POST['ndk_encrypt_posts'] ) );
             update_option( 'ndk_encrypt_pages', isset( $_POST['ndk_encrypt_pages'] ) );
             update_option( 'ndk_encrypt_comments', isset( $_POST['ndk_encrypt_comments'] ) );

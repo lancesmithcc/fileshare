@@ -41,6 +41,7 @@ from .database import db
 from .extensions import sock
 from .files import _asset_path
 from .models import (
+    ChatBlock,
     CircleMembership,
     ChatMessage,
     ChatMessageKey,
@@ -290,7 +291,7 @@ def chat_online_api():
             summary_name = circle.name
         else:
             summary_id = "unaffiliated"
-            summary_name = "Unaffiliated"
+            summary_name = "unaffiliated"
         if summary_id not in circle_summary:
             circle_summary[summary_id] = {
                 "id": summary_id,
@@ -380,6 +381,29 @@ def _chat_ready_state() -> str:
     if private_key is None:
         return "locked"
     return "ready"
+
+
+def _is_user_blocked(user_id: int) -> bool:
+    """Check if current user has blocked the specified user."""
+    return db.session.query(
+        ChatBlock.query.filter_by(
+            blocker_id=current_user.id,
+            blocked_id=user_id
+        ).exists()
+    ).scalar()
+
+
+def _get_blocked_user_id_for_dm(thread: ChatThread) -> int | None:
+    """For DM threads, return the other user's ID if current user has them blocked."""
+    if thread.type != "dm":
+        return None
+    other_user = next(
+        (member.user for member in thread.members if member.user_id != current_user.id),
+        None
+    )
+    if other_user and _is_user_blocked(other_user.id):
+        return other_user.id
+    return None
 
 
 def _thread_display_name(thread: ChatThread) -> str:
@@ -1009,6 +1033,7 @@ def index():
 
     thread_ids = [summary.thread.id for summary in thread_summaries]
     current_thread_id = selected_summary.thread.id if selected_summary else None
+    blocked_user_id = _get_blocked_user_id_for_dm(selected_thread) if selected_thread else None
 
     return render_template(
         "chat/index.html",
@@ -1022,6 +1047,7 @@ def index():
         max_message_length=MAX_MESSAGE_LENGTH,
         thread_ids=thread_ids,
         current_thread_id=current_thread_id,
+        blocked_user_id=blocked_user_id,
     )
 
 
@@ -1175,6 +1201,62 @@ def leave_thread(thread_id: int):
     return redirect(url_for("chat.index"))
 
 
+@chat_bp.route("/threads/<int:thread_id>/kick/<int:user_id>", methods=["POST"])
+@login_required
+def kick_member(thread_id: int, user_id: int):
+    is_async = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    thread = _load_thread_for_user(thread_id)
+    if thread is None:
+        if is_async:
+            return jsonify({"ok": False, "error": "That whisper is no longer available."}), 404
+        flash("That whisper is no longer available.", "warning")
+        return redirect(url_for("chat.index"))
+
+    if thread.type != "group":
+        if is_async:
+            return jsonify({"ok": False, "error": "Only group channels support kicking members."}), 400
+        flash("Only group channels support kicking members.", "warning")
+        return redirect(url_for("chat.index", thread=thread.id))
+
+    if thread.creator_id != current_user.id:
+        message = "Only the group founder can kick members."
+        if is_async:
+            return jsonify({"ok": False, "error": message}), 403
+        flash(message, "warning")
+        return redirect(url_for("chat.index", thread=thread.id))
+
+    if user_id == current_user.id:
+        message = "You cannot kick yourself from the group."
+        if is_async:
+            return jsonify({"ok": False, "error": message}), 400
+        flash(message, "warning")
+        return redirect(url_for("chat.index", thread=thread.id))
+
+    membership = (
+        ChatThreadMember.query.filter(
+            ChatThreadMember.thread_id == thread.id,
+            ChatThreadMember.user_id == user_id,
+        )
+        .limit(1)
+        .one_or_none()
+    )
+    if membership is None:
+        if is_async:
+            return jsonify({"ok": False, "error": "That member is not in this group."}), 404
+        flash("That member is not in this group.", "warning")
+        return redirect(url_for("chat.index", thread=thread.id))
+
+    kicked_user = membership.user
+    _handle_member_departure(thread, membership)
+    db.session.commit()
+
+    if is_async:
+        return jsonify({"ok": True, "thread_id": thread_id, "user_id": user_id})
+
+    flash(f"{kicked_user.username} has been removed from the group.", "info")
+    return redirect(url_for("chat.index", thread=thread_id))
+
+
 @chat_bp.route("/threads/<int:thread_id>/delete", methods=["POST"])
 @login_required
 def delete_thread(thread_id: int):
@@ -1231,6 +1313,8 @@ def delete_thread(thread_id: int):
 @login_required
 def delete_message(message_id: int):
     is_async = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    delete_scope = request.form.get("scope", "all")  # "self" or "all"
+
     message = (
         ChatMessage.query.options(
             joinedload(ChatMessage.thread)
@@ -1255,6 +1339,26 @@ def delete_message(message_id: int):
         flash("You are not part of that whisper.", "danger")
         return redirect(url_for("chat.index"))
 
+    # For one-on-one chats, allow "delete for self" option
+    if delete_scope == "self" and thread.type == "dm":
+        # Just remove the user's message key to make it unreadable for them
+        key = next((k for k in message.keys if k.user_id == current_user.id), None)
+        if key:
+            db.session.delete(key)
+            db.session.commit()
+
+            if is_async:
+                return jsonify({"ok": True, "thread_id": thread.id, "message_id": message_id, "scope": "self"})
+
+            flash("Message removed for you.", "info")
+            return redirect(url_for("chat.index", thread=thread.id))
+        else:
+            if is_async:
+                return jsonify({"ok": False, "error": "Message key not found."}), 404
+            flash("Message key not found.", "warning")
+            return redirect(url_for("chat.index", thread=thread.id))
+
+    # For "delete for all" or group messages, check permissions
     can_delete = message.sender_id == current_user.id
     if not can_delete and thread.type == "group" and membership.is_admin:
         can_delete = True
@@ -1271,10 +1375,76 @@ def delete_message(message_id: int):
     _broadcast_message_deleted(thread, message_id)
 
     if is_async:
-        return jsonify({"ok": True, "thread_id": thread_id, "message_id": message_id})
+        return jsonify({"ok": True, "thread_id": thread_id, "message_id": message_id, "scope": "all"})
 
     flash("Message removed.", "info")
     return redirect(url_for("chat.index", thread=thread_id))
+
+
+@chat_bp.route("/block/<int:user_id>", methods=["POST"])
+@login_required
+def block_user(user_id: int):
+    is_async = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    if user_id == current_user.id:
+        if is_async:
+            return jsonify({"ok": False, "error": "You cannot block yourself."}), 400
+        flash("You cannot block yourself.", "warning")
+        return redirect(url_for("chat.index"))
+
+    target = User.query.get(user_id)
+    if not target or target.status != "active":
+        if is_async:
+            return jsonify({"ok": False, "error": "That user is not available."}), 404
+        flash("That user is not available.", "warning")
+        return redirect(url_for("chat.index"))
+
+    existing_block = ChatBlock.query.filter_by(
+        blocker_id=current_user.id,
+        blocked_id=user_id
+    ).first()
+
+    if existing_block:
+        if is_async:
+            return jsonify({"ok": True, "already_blocked": True})
+        flash(f"You have already blocked {target.username}.", "info")
+        return redirect(url_for("chat.index"))
+
+    block = ChatBlock(blocker_id=current_user.id, blocked_id=user_id)
+    db.session.add(block)
+    db.session.commit()
+
+    if is_async:
+        return jsonify({"ok": True, "user_id": user_id, "username": target.username})
+
+    flash(f"You have blocked {target.username}.", "info")
+    return redirect(url_for("chat.index"))
+
+
+@chat_bp.route("/unblock/<int:user_id>", methods=["POST"])
+@login_required
+def unblock_user(user_id: int):
+    is_async = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+    block = ChatBlock.query.filter_by(
+        blocker_id=current_user.id,
+        blocked_id=user_id
+    ).first()
+
+    if not block:
+        if is_async:
+            return jsonify({"ok": False, "error": "That user is not blocked."}), 404
+        flash("That user is not blocked.", "warning")
+        return redirect(url_for("chat.index"))
+
+    target = block.blocked
+    db.session.delete(block)
+    db.session.commit()
+
+    if is_async:
+        return jsonify({"ok": True, "user_id": user_id, "username": target.username})
+
+    flash(f"You have unblocked {target.username}.", "info")
+    return redirect(url_for("chat.index"))
 
 
 @chat_bp.route("/send", methods=["POST"])

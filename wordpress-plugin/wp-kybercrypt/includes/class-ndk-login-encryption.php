@@ -49,6 +49,12 @@ class NDK_Login_Encryption {
     public function ensure_site_keypair() {
         $site_keys = get_option( 'ndk_site_login_keys' );
 
+        if ( ! NDK_Security::get_login_key_passphrase() ) {
+            add_action( 'admin_notices', function() {
+                echo '<div class="notice notice-error"><p><strong>WP-KyberCrypt:</strong> Define <code>NDK_LOGIN_KEY_PASSPHRASE</code> in wp-config.php to unlock encrypted logins.</p></div>';
+            } );
+        }
+
         if ( ! $site_keys || ! isset( $site_keys['public_key'] ) ) {
             $this->generate_site_keypair();
         }
@@ -60,14 +66,15 @@ class NDK_Login_Encryption {
     private function generate_site_keypair() {
         $api = NDK()->get_api_client();
 
-        // Get passphrase from constant or generate one
+        // Require passphrase constant before generating
         $passphrase = NDK_Security::get_login_key_passphrase();
         if ( ! $passphrase ) {
-            // Generate with a strong site-specific passphrase if not in constant
-            $passphrase = hash( 'sha256', AUTH_KEY . SECURE_AUTH_KEY . 'ndk-site-login' );
+            error_log( 'WP-KyberCrypt: NDK_LOGIN_KEY_PASSPHRASE must be defined before generating site keypair' );
+            return false;
         }
 
-        $result = $api->generate_keypair( $passphrase );
+        // Passphrase is managed locally by the Python service; no need to send it over HTTP.
+        $result = $api->generate_keypair( null );
 
         if ( ! $result['success'] ) {
             error_log( 'WP-KyberCrypt: Failed to generate site login keypair' );
@@ -82,14 +89,7 @@ class NDK_Login_Encryption {
             'encrypted_private_key' => $data['encrypted_private_key'],
             'salt'                  => $data['salt'],
             'nonce'                 => $data['nonce'],
-            // SECURITY: Passphrase should be in wp-config.php as NDK_LOGIN_KEY_PASSPHRASE
-            // Only store it in DB if constant not defined (backward compat)
         );
-
-        // Only store passphrase in DB if constant not defined (backward compat)
-        if ( ! defined( 'NDK_LOGIN_KEY_PASSPHRASE' ) ) {
-            $site_keys['passphrase'] = $passphrase;
-        }
 
         update_option( 'ndk_site_login_keys', $site_keys );
 
@@ -174,7 +174,8 @@ class NDK_Login_Encryption {
      */
     public function ajax_encrypted_login() {
         // SECURITY: Validate request method
-        if ( $_SERVER['REQUEST_METHOD'] !== 'POST' ) {
+        $request_method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( $_SERVER['REQUEST_METHOD'] ) : '';
+        if ( $request_method !== 'POST' ) {
             wp_send_json_error( array( 'message' => 'Login failed.' ) );
         }
 
@@ -182,7 +183,9 @@ class NDK_Login_Encryption {
         $ip = isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : '0.0.0.0';
         $rate_limit = NDK_Security::check_login_rate_limit( $ip );
         if ( ! $rate_limit['allowed'] ) {
-            wp_send_json_error( array( 'message' => $rate_limit['message'] ) );
+            NDK_Security::record_login_attempt( $ip, false );
+            error_log( 'WP-KyberCrypt: login throttled for IP ' . NDK_Security::sanitize_log( $ip ) );
+            wp_send_json_error( array( 'message' => 'Login failed.' ) );
         }
 
         // Verify nonce
@@ -246,23 +249,20 @@ class NDK_Login_Encryption {
             return false;
         }
 
-        // Get passphrase from constant or fallback to option
-        $passphrase = NDK_Security::get_login_key_passphrase();
-        if ( ! $passphrase ) {
+        // Require passphrase constant even though we no longer transmit it
+        if ( ! NDK_Security::get_login_key_passphrase() ) {
             error_log( 'WP-KyberCrypt: No login key passphrase configured' );
             return false;
         }
 
         $api = NDK()->get_api_client();
 
-        // Unlock private key
-        // NOTE: In production, passphrase should be in Python service ENV
-        // and not sent over HTTP
+        // Unlock private key without transmitting the passphrase
         $unlock_result = $api->unlock_keypair(
             $site_keys['encrypted_private_key'],
             $site_keys['salt'],
             $site_keys['nonce'],
-            $passphrase
+            null
         );
 
         if ( ! $unlock_result['success'] ) {

@@ -115,26 +115,43 @@
                   {% for member in selected_thread_members %}
                     <div role="listitem" class="chat-member-chip">
                       {{ ui.user_chip(member, size='xs', link='message') }}
+                      {% if selected_thread.is_group and selected_thread.thread.creator_id == current_user.id and member.id != current_user.id %}
+                        <button type="button" class="chat-member-kick" data-kick-member data-thread-id="{{ selected_thread.thread.id }}" data-user-id="{{ member.id }}" title="Remove {{ member.username }} from group">×</button>
+                      {% endif %}
                     </div>
                   {% endfor %}
                 </div>
               {% endif %}
             </div>
           </div>
-          {% if selected_thread.is_group %}
           <div class="chat-window-actions">
-            {% if selected_thread.thread.creator_id == current_user.id %}
-            <button type="button" class="ghost-button danger-button" data-thread-action="delete" data-thread-id="{{ selected_thread.thread.id }}">
-              Delete Group
-            </button>
+            {% if selected_thread.is_group %}
+              {% if selected_thread.thread.creator_id == current_user.id %}
+              <button type="button" class="ghost-button danger-button" data-thread-action="delete" data-thread-id="{{ selected_thread.thread.id }}">
+                Delete Group
+              </button>
+              {% else %}
+              <button type="button" class="ghost-button" data-thread-action="leave" data-thread-id="{{ selected_thread.thread.id }}">
+                Leave Group
+              </button>
+              {% endif %}
             {% else %}
-            <button type="button" class="ghost-button" data-thread-action="leave" data-thread-id="{{ selected_thread.thread.id }}">
-              Leave Group
-            </button>
+              {% if blocked_user_id %}
+              <button type="button" class="ghost-button" data-unblock-user data-user-id="{{ blocked_user_id }}">
+                Unblock User
+              </button>
+              {% else %}
+                {% set other_user = selected_thread_members | selectattr('id', 'ne', current_user.id) | first %}
+                {% if other_user %}
+                <button type="button" class="ghost-button danger-button" data-block-user data-user-id="{{ other_user.id }}">
+                  Block User
+                </button>
+                {% endif %}
+              {% endif %}
             {% endif %}
           </div>
-          {% endif %}
         </header>
+        <div class="chat-window-resize-handle" data-main-chat-resize></div>
         <div class="chat-message-list" data-message-list>
           {% if messages %}
             {% for message in messages %}
@@ -157,6 +174,7 @@
                     data-message-delete
                     data-thread-id="{{ selected_thread.thread.id }}"
                     data-message-id="{{ message.id }}"
+                    data-is-group="{{ 1 if selected_thread.is_group else 0 }}"
                     aria-label="Delete message"
                   >×</button>
                   {% endif %}
@@ -183,6 +201,31 @@
             <button type="submit" class="btn btn-primary chat-send-btn">Send Encrypted Message</button>
           </div>
         </form>
+
+        <!-- Emoji Picker Modal (inside chat window) -->
+        <div class="emoji-picker-modal in-chat" data-emoji-picker-modal style="display: none;">
+          <div class="emoji-picker-overlay" data-emoji-picker-overlay></div>
+          <div class="emoji-picker-content">
+            <div class="emoji-picker-header">
+              <h3>Pick an Emoji</h3>
+              <input type="text" class="emoji-search-input" placeholder="Search emojis..." data-emoji-search-input>
+              <button type="button" class="emoji-picker-close" data-emoji-picker-close>×</button>
+            </div>
+            <div class="emoji-picker-grid" data-emoji-grid></div>
+          </div>
+        </div>
+
+        <!-- GIPHY Picker Modal (inside chat window) -->
+        <div class="gif-picker-modal in-chat" data-gif-picker-modal style="display: none;">
+          <div class="gif-picker-overlay" data-gif-picker-overlay></div>
+          <div class="gif-picker-content">
+            <div class="gif-picker-header">
+              <input type="text" class="gif-search-input" placeholder="Search GIPHY..." data-gif-search-input>
+              <button type="button" class="gif-picker-close" data-gif-picker-close>×</button>
+            </div>
+            <div class="gif-picker-results" data-gif-results></div>
+          </div>
+        </div>
       {% else %}
         <div class="chat-placeholder">
           <p>Select or create a channel to begin an encrypted conversation.</p>
@@ -190,36 +233,12 @@
       {% endif %}
     </section>
   </div>
-
-  <!-- Emoji Picker Modal -->
-  <div class="emoji-picker-modal" data-emoji-picker-modal style="display: none;">
-    <div class="emoji-picker-overlay" data-emoji-picker-overlay></div>
-    <div class="emoji-picker-content">
-      <div class="emoji-picker-header">
-        <h3>Pick an Emoji</h3>
-        <button type="button" class="emoji-picker-close" data-emoji-picker-close>×</button>
-      </div>
-      <div class="emoji-picker-grid" data-emoji-grid></div>
-    </div>
-  </div>
-
-  <!-- GIPHY Picker Modal -->
-  <div class="gif-picker-modal" data-gif-picker-modal style="display: none;">
-    <div class="gif-picker-overlay" data-gif-picker-overlay></div>
-    <div class="gif-picker-content">
-      <div class="gif-picker-header">
-        <input type="text" class="gif-search-input" placeholder="Search GIPHY..." data-gif-search-input>
-        <button type="button" class="gif-picker-close" data-gif-picker-close>×</button>
-      </div>
-      <div class="gif-picker-results" data-gif-results></div>
-    </div>
-  </div>
 {% endif %}
 {% endblock %}
 
 {% block extra_scripts %}
 {% if state == "ready" or state == "locked" %}
-<script src="{{ url_for('static', filename='js/emoji_picker.js') }}?v=20251026"></script>
-<script src="{{ url_for('static', filename='js/giphy.js') }}?v=20251026"></script>
+<script src="{{ url_for('static', filename='js/emoji_picker.js') }}?v=1761507823"></script>
+<script src="{{ url_for('static', filename='js/giphy.js') }}?v=1761507823"></script>
 {% endif %}
 {% endblock %}
