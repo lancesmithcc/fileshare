@@ -69,6 +69,9 @@ class NDK_Admin {
         register_setting( 'ndk_feature_settings', 'ndk_encrypt_comments' );
         register_setting( 'ndk_feature_settings', 'ndk_auto_generate_keys' );
 
+        // Security Settings
+        register_setting( 'ndk_security_settings', 'ndk_force_quantum_login' );
+
         // Sanitize callbacks
         add_filter( 'sanitize_option_ndk_api_url', 'esc_url_raw' );
         add_filter( 'sanitize_option_ndk_api_key', 'sanitize_text_field' );
@@ -107,6 +110,7 @@ class NDK_Admin {
             update_option( 'ndk_encrypt_pages', isset( $_POST['ndk_encrypt_pages'] ) );
             update_option( 'ndk_encrypt_comments', isset( $_POST['ndk_encrypt_comments'] ) );
             update_option( 'ndk_auto_generate_keys', isset( $_POST['ndk_auto_generate_keys'] ) );
+            update_option( 'ndk_force_quantum_login', isset( $_POST['ndk_force_quantum_login'] ) );
 
             echo '<div class="notice notice-success"><p>' . __( 'Settings saved successfully!', 'wp-kybercrypt' ) . '</p></div>';
         }

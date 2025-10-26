@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ site_settings.site_title }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20251014">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20251031">
     {% if site_settings.custom_css %}
     <style id="custom-css">
       {{ site_settings.custom_css | safe }}
@@ -66,8 +66,35 @@
       <span class="dock-label">Messages</span>
     </div>
     <div class="messenger-tray" data-messenger-tray></div>
-    <script src="{{ url_for('static', filename='js/chat_tone.js') }}?v=20251014"></script>
-    <script src="{{ url_for('static', filename='js/chat.js') }}?v=20251014"></script>
+
+    <!-- Emoji Picker Modal -->
+    <div class="emoji-picker-modal" data-emoji-picker-modal style="display: none;">
+      <div class="emoji-picker-overlay" data-emoji-picker-overlay></div>
+      <div class="emoji-picker-content">
+        <div class="emoji-picker-header">
+          <input type="text" class="emoji-search-input" placeholder="Search emojis..." data-emoji-search-input>
+          <button type="button" class="emoji-picker-close" data-emoji-picker-close>×</button>
+        </div>
+        <div class="emoji-picker-grid" data-emoji-grid></div>
+      </div>
+    </div>
+
+    <!-- GIPHY Picker Modal -->
+    <div class="gif-picker-modal" data-gif-picker-modal style="display: none;">
+      <div class="gif-picker-overlay" data-gif-picker-overlay></div>
+      <div class="gif-picker-content">
+        <div class="gif-picker-header">
+          <input type="text" class="gif-search-input" placeholder="Search GIPHY..." data-gif-search-input>
+          <button type="button" class="gif-picker-close" data-gif-picker-close>×</button>
+        </div>
+        <div class="gif-picker-results" data-gif-results></div>
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/chat_tone.js') }}?v=20251026"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}?v=20251026"></script>
+    <script src="{{ url_for('static', filename='js/emoji_picker.js') }}?v=20251031"></script>
+    <script src="{{ url_for('static', filename='js/giphy.js') }}?v=20251031"></script>
     {% endif %}
     {% block extra_scripts %}{% endblock %}
   </body>

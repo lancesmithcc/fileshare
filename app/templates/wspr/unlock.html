@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Unlock Chat</h1>
+<div class="card">
+  <p>Enter your encryption passphrase to unlock your messages.</p>
+</div>
+
+<form method="post" class="card form">
+  <label>
+    encryption passphrase
+    <input type="password" name="passphrase" required autofocus>
+  </label>
+  <button type="submit" class="button">Unlock</button>
+</form>
+
+<p><a href="{{ url_for('wspr.logout') }}">← Log out</a></p>
+{% endblock %}

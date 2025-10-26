@@ -68,6 +68,7 @@ def create_app() -> Flask:
 
     with app.app_context():
         from . import models  # noqa: F401
+        from . import wspr_models  # noqa: F401
         inspector = inspect(db.engine)
         tables_before = set(inspector.get_table_names())
 
@@ -176,6 +177,7 @@ def create_app() -> Flask:
     from .neod_views import neod_bp
     from .arch import arch_bp
     from .chat import chat_bp
+    from .wspr import wspr_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(files_bp)
@@ -187,5 +189,6 @@ def create_app() -> Flask:
     app.register_blueprint(neod_bp)
     app.register_blueprint(arch_bp)
     app.register_blueprint(chat_bp)
+    app.register_blueprint(wspr_bp)
 
     return app

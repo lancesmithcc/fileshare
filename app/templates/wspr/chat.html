@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="wspr-chat-container">
+  <aside class="wspr-sidebar">
+    <div class="wspr-header">
+      <h2>🔐 WSPR</h2>
+      <p class="wspr-username">{{ current_user.username }}</p>
+    </div>
+
+    <div class="wspr-rooms">
+      <h3>Your Rooms</h3>
+      {% if rooms %}
+        <ul class="wspr-room-list">
+          {% for room in rooms %}
+            <li class="wspr-room-item {% if current_room and current_room.id == room.id %}active{% endif %}">
+              <a href="{{ url_for('wspr.chat', room=room.id) }}">
+                <strong>{{ room.name }}</strong>
+                <span class="wspr-room-members">{{ room.member_count }} members</span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="wspr-empty">No rooms yet. Create one below!</p>
+      {% endif %}
+    </div>
+
+    <div class="wspr-actions">
+      <h3>Actions</h3>
+      <form method="post" action="{{ url_for('wspr.create_room') }}" class="wspr-create-room-form">
+        <input type="text" name="room_name" placeholder="Room name" required>
+        <button type="submit" class="button">Create Room</button>
+      </form>
+      <a href="{{ url_for('wspr.logout') }}" class="btn btn-secondary">Log Out</a>
+    </div>
+  </aside>
+
+  <main class="wspr-main">
+    {% if current_room %}
+      <div class="wspr-chat-header">
+        <h2>{{ current_room.name }}</h2>
+        <p>{{ current_room.member_count }} members • Created {{ current_room.created_at.strftime('%Y-%m-%d') }}</p>
+      </div>
+
+      <div class="wspr-messages" id="wspr-messages">
+        {% if messages %}
+          {% for msg in messages %}
+            <div class="wspr-message {% if msg.is_self %}wspr-message-self{% endif %}">
+              <div class="wspr-message-sender">{{ msg.sender.username if msg.sender else 'Unknown' }}</div>
+              <div class="wspr-message-body">{{ msg.body }}</div>
+              <div class="wspr-message-time">{{ msg.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="wspr-empty-messages">
+            <p>No messages yet. Start the conversation!</p>
+          </div>
+        {% endif %}
+      </div>
+
+      <form method="post" action="{{ url_for('wspr.send_message') }}" class="wspr-compose" id="wspr-compose-form">
+        <input type="hidden" name="room_id" value="{{ current_room.id }}">
+        <textarea name="body" placeholder="Type your message..." required rows="3" id="wspr-message-input"></textarea>
+        <button type="submit" class="button">Send</button>
+      </form>
+    {% else %}
+      <div class="wspr-welcome">
+        <h2>Welcome to WSPR</h2>
+        <p>Select a room from the sidebar or create a new one to start chatting.</p>
+        <div class="wspr-info-card">
+          <h3>🛡️ Post-Quantum Secure</h3>
+          <p>All messages are protected with ML-KEM-768 (Kyber) quantum-resistant encryption.</p>
+        </div>
+      </div>
+    {% endif %}
+  </main>
+</div>
+
+<style>
+.wspr-chat-container {
+  display: flex;
+  gap: 1rem;
+  min-height: 80vh;
+  max-width: 100%;
+}
+
+.wspr-sidebar {
+  width: 300px;
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.wspr-header h2 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.wspr-username {
+  color: var(--text-muted);
+  margin: 0.5rem 0 0 0;
+}
+
+.wspr-room-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.wspr-room-item {
+  margin-bottom: 0.5rem;
+}
+
+.wspr-room-item a {
+  display: block;
+  padding: 0.75rem;
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: background 0.2s;
+}
+
+.wspr-room-item a:hover {
+  background: var(--bg-hover);
+}
+
+.wspr-room-item.active a {
+  background: var(--brand);
+  color: white;
+}
+
+.wspr-room-members {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+.wspr-room-item.active .wspr-room-members {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.wspr-create-room-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.wspr-create-room-form input {
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.wspr-main {
+  flex: 1;
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.wspr-chat-header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+
+.wspr-chat-header h2 {
+  margin: 0;
+}
+
+.wspr-chat-header p {
+  margin: 0.5rem 0 0 0;
+  color: var(--text-muted);
+}
+
+.wspr-messages {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.wspr-message {
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  max-width: 70%;
+}
+
+.wspr-message-self {
+  align-self: flex-end;
+  background: var(--brand);
+  color: white;
+}
+
+.wspr-message-sender {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.wspr-message-body {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.wspr-message-time {
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+  opacity: 0.7;
+}
+
+.wspr-compose {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.wspr-compose textarea {
+  flex: 1;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  resize: vertical;
+  font-family: inherit;
+}
+
+.wspr-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+}
+
+.wspr-info-card {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  max-width: 400px;
+}
+
+.wspr-empty,
+.wspr-empty-messages {
+  color: var(--text-muted);
+  padding: 1rem;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .wspr-chat-container {
+    flex-direction: column;
+  }
+
+  .wspr-sidebar {
+    width: 100%;
+  }
+}
+</style>
+
+<script>
+// Auto-scroll to bottom of messages
+const messagesContainer = document.getElementById('wspr-messages');
+if (messagesContainer) {
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// Handle form submission
+const composeForm = document.getElementById('wspr-compose-form');
+if (composeForm) {
+  composeForm.addEventListener('submit', function(e) {
+    // Allow normal form submission for now
+    // TODO: Convert to AJAX/WebSocket in the future
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="landing-hero">
+  <div class="landing-hero-inner">
+    <h1>🔐 WSPR</h1>
+    <p class="landing-hero-subtitle">Post-Quantum Secure Chat</p>
+    <p class="landing-hero-description">End-to-end encrypted messaging using ML-KEM-768 (Kyber) quantum-resistant cryptography. Chat securely, even against future quantum computers.</p>
+    {% if is_logged_in %}
+    <div class="landing-actions">
+      <a class="btn btn-primary" href="{{ url_for('wspr.chat') }}">Open Chat</a>
+    </div>
+    {% else %}
+    <div class="landing-actions">
+      <a class="btn btn-primary" href="{{ url_for('wspr.register') }}">Create Account</a>
+      <a class="btn btn-secondary" href="{{ url_for('wspr.login') }}">Sign In</a>
+    </div>
+    {% endif %}
+  </div>
+  <aside class="landing-hero-showcase">
+    <div class="showcase-card">
+      <h3>🛡️ Quantum-Safe</h3>
+      <p>Protected by ML-KEM-768, a NIST-standardized post-quantum key encapsulation mechanism designed to resist attacks from quantum computers.</p>
+    </div>
+    <div class="showcase-card">
+      <h3>🔒 End-to-End Encrypted</h3>
+      <p>Your messages are encrypted on your device and can only be read by you and your intended recipients. We can't read them, even if we wanted to.</p>
+    </div>
+  </aside>
+</section>
+
+<section class="landing-grid">
+  <article class="landing-card">
+    <h2>🌐 Open to Everyone</h2>
+    <p>WSPR is a public service. Anyone can create an account and start chatting securely.</p>
+  </article>
+  <article class="landing-card">
+    <h2>🔑 Your Keys, Your Data</h2>
+    <p>Your encryption keys are protected by your passphrase. Only you can unlock your messages.</p>
+  </article>
+  <article class="landing-card">
+    <h2>💬 Private Rooms</h2>
+    <p>Create private chat rooms and invite others to join secure conversations.</p>
+  </article>
+  <article class="landing-card">
+    <h2>🚀 Future-Proof Security</h2>
+    <p>Kyber-768 is designed to protect your messages against both current and future cryptographic attacks.</p>
+  </article>
+</section>
+
+<section class="landing-footer-callout">
+  <div class="landing-footer-inner">
+    <h2>Ready for quantum-safe communication?</h2>
+    <p>Join WSPR and experience the future of secure messaging.</p>
+    {% if not is_logged_in %}
+    <div class="landing-actions">
+      <a class="btn btn-primary" href="{{ url_for('wspr.register') }}">Get Started</a>
+      <a class="btn btn-secondary" href="{{ url_for('wspr.login') }}">Sign In</a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

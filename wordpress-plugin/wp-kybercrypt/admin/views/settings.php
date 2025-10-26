@@ -11,9 +11,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 ?>
 
 <div class="wrap ndk-admin-wrap">
-    <h1>
-        <?php _e( 'Neo-Druidic Kyber Encryption Settings', 'wp-kybercrypt' ); ?>
-        <span class="ndk-badge">ML-KEM-768</span>
+    <h1 style="display: flex; align-items: center; gap: 15px;">
+        <img src="<?php echo plugins_url( 'assets/logo.svg', dirname( dirname( __FILE__ ) ) ); ?>" alt="Logo" style="width: 48px; height: 48px;">
+        <span>
+            <?php _e( 'Neo-Druidic Kyber Encryption Settings', 'wp-kybercrypt' ); ?>
+            <span class="ndk-badge">ML-KEM-768</span>
+        </span>
     </h1>
 
     <p class="description">
@@ -34,35 +37,86 @@ if ( ! defined( 'ABSPATH' ) ) {
                                 <label for="ndk_api_url"><?php _e( 'API URL', 'wp-kybercrypt' ); ?></label>
                             </th>
                             <td>
+                                <?php
+                                $api_url = NDK_Security::get_api_url();
+                                $api_url_display = ! empty( $api_url ) ? $api_url : 'https://awen01.cc';
+                                ?>
                                 <input
                                     type="url"
                                     id="ndk_api_url"
                                     name="ndk_api_url"
-                                    value="<?php echo esc_attr( get_option( 'ndk_api_url', 'https://awen01.cc' ) ); ?>"
+                                    value="<?php echo esc_attr( $api_url_display ); ?>"
                                     class="regular-text"
                                     required
                                 >
                                 <p class="description">
-                                    <?php _e( 'The base URL of your Neo-Druidic Kyber API endpoint.', 'wp-kybercrypt' ); ?>
+                                    <?php _e( 'The base URL of your Neo-Druidic Kyber API endpoint. For security, this should be localhost or a private network URL.', 'wp-kybercrypt' ); ?>
                                 </p>
                             </td>
                         </tr>
 
                         <tr>
                             <th scope="row">
-                                <label for="ndk_api_key"><?php _e( 'API Key', 'wp-kybercrypt' ); ?></label>
+                                <?php _e( 'API Key', 'wp-kybercrypt' ); ?>
                             </th>
                             <td>
-                                <input
-                                    type="password"
-                                    id="ndk_api_key"
-                                    name="ndk_api_key"
-                                    value="<?php echo esc_attr( get_option( 'ndk_api_key', '' ) ); ?>"
-                                    class="regular-text"
-                                    autocomplete="off"
-                                >
+                                <?php
+                                $api_key = NDK_Security::get_api_key();
+                                $api_key_configured = ! empty( $api_key );
+                                $api_key_source = defined( 'NDK_API_KEY' ) ? 'wp-config.php' : 'database';
+                                ?>
+                                <strong>
+                                    <?php if ( $api_key_configured ) : ?>
+                                        <span style="color: #46b450;">✅ CONFIGURED</span>
+                                        <span style="color: #666; font-size: 12px;">(from <?php echo esc_html( $api_key_source ); ?>)</span>
+                                    <?php else : ?>
+                                        <span style="color: #dc3232;">❌ NOT CONFIGURED</span>
+                                    <?php endif; ?>
+                                </strong>
                                 <p class="description">
-                                    <?php _e( 'Optional API key for authentication (if required by your API endpoint).', 'wp-kybercrypt' ); ?>
+                                    <?php
+                                    if ( defined( 'NDK_API_KEY' ) ) {
+                                        _e( '<strong>Security:</strong> API key is securely stored in wp-config.php. Do not store in database.', 'wp-kybercrypt' );
+                                    } else {
+                                        printf(
+                                            __( '<strong>Security Warning:</strong> For production, define <code>NDK_API_KEY</code> constant in wp-config.php instead of storing in database. See <a href="%s" target="_blank">Security Guide</a>.', 'wp-kybercrypt' ),
+                                            plugins_url( 'SECURITY.md', dirname( dirname( __FILE__ ) ) )
+                                        );
+                                    }
+                                    ?>
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th scope="row">
+                                <?php _e( 'Login Key Passphrase', 'wp-kybercrypt' ); ?>
+                            </th>
+                            <td>
+                                <?php
+                                $passphrase = NDK_Security::get_login_key_passphrase();
+                                $passphrase_configured = ! empty( $passphrase );
+                                $passphrase_source = defined( 'NDK_LOGIN_KEY_PASSPHRASE' ) ? 'wp-config.php' : 'database';
+                                ?>
+                                <strong>
+                                    <?php if ( $passphrase_configured ) : ?>
+                                        <span style="color: #46b450;">✅ CONFIGURED</span>
+                                        <span style="color: #666; font-size: 12px;">(from <?php echo esc_html( $passphrase_source ); ?>)</span>
+                                    <?php else : ?>
+                                        <span style="color: #dc3232;">❌ NOT CONFIGURED</span>
+                                    <?php endif; ?>
+                                </strong>
+                                <p class="description">
+                                    <?php
+                                    if ( defined( 'NDK_LOGIN_KEY_PASSPHRASE' ) ) {
+                                        _e( '<strong>Security:</strong> Login key passphrase is securely stored in wp-config.php.', 'wp-kybercrypt' );
+                                    } else {
+                                        printf(
+                                            __( '<strong>Security Warning:</strong> For production, define <code>NDK_LOGIN_KEY_PASSPHRASE</code> constant in wp-config.php. See <a href="%s" target="_blank">Security Guide</a>.', 'wp-kybercrypt' ),
+                                            plugins_url( 'SECURITY.md', dirname( dirname( __FILE__ ) ) )
+                                        );
+                                    }
+                                    ?>
                                 </p>
                             </td>
                         </tr>
@@ -134,6 +188,30 @@ if ( ! defined( 'ABSPATH' ) ) {
                                 </label>
                                 <p class="description">
                                     <?php _e( 'Automatically generate Kyber keypairs for users when needed. Keys are encrypted with user credentials.', 'wp-kybercrypt' ); ?>
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="ndk-card">
+                    <h2><?php _e( 'Security Settings', 'wp-kybercrypt' ); ?></h2>
+
+                    <table class="form-table" role="presentation">
+                        <tr>
+                            <th scope="row"><?php _e( 'Quantum Login Enforcement', 'wp-kybercrypt' ); ?></th>
+                            <td>
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        name="ndk_force_quantum_login"
+                                        value="1"
+                                        <?php checked( get_option( 'ndk_force_quantum_login', false ) ); ?>
+                                    >
+                                    <?php _e( 'Force quantum-safe login (block classic wp-login.php)', 'wp-kybercrypt' ); ?>
+                                </label>
+                                <p class="description">
+                                    <?php _e( 'When enabled, all login attempts must use quantum-safe encrypted authentication. Classic username/password forms, XML-RPC, and REST Basic Auth will be blocked. <strong>Warning:</strong> Only enable this after verifying quantum login works correctly.', 'wp-kybercrypt' ); ?>
                                 </p>
                             </td>
                         </tr>

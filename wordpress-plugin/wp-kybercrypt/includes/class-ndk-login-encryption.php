@@ -36,6 +36,11 @@ class NDK_Login_Encryption {
         // Add quantum security badge to login form
         add_action( 'login_form', array( $this, 'add_quantum_security_badge' ) );
         add_action( 'login_footer', array( $this, 'add_login_footer_badge' ) );
+
+        // SECURITY: Block classic login if force_quantum_login enabled
+        add_action( 'login_init', array( $this, 'block_classic_login' ) );
+        add_filter( 'xmlrpc_enabled', array( $this, 'block_xmlrpc_when_quantum_forced' ) );
+        add_filter( 'rest_authentication_errors', array( $this, 'block_rest_basic_auth' ) );
     }
 
     /**
@@ -55,8 +60,12 @@ class NDK_Login_Encryption {
     private function generate_site_keypair() {
         $api = NDK()->get_api_client();
 
-        // Generate with a strong site-specific passphrase
-        $passphrase = hash( 'sha256', AUTH_KEY . SECURE_AUTH_KEY . 'ndk-site-login' );
+        // Get passphrase from constant or generate one
+        $passphrase = NDK_Security::get_login_key_passphrase();
+        if ( ! $passphrase ) {
+            // Generate with a strong site-specific passphrase if not in constant
+            $passphrase = hash( 'sha256', AUTH_KEY . SECURE_AUTH_KEY . 'ndk-site-login' );
+        }
 
         $result = $api->generate_keypair( $passphrase );
 
@@ -67,13 +76,20 @@ class NDK_Login_Encryption {
 
         $data = $result['data'];
 
+        // Store keys WITHOUT passphrase in database
         $site_keys = array(
             'public_key'            => $data['public_key'],
             'encrypted_private_key' => $data['encrypted_private_key'],
             'salt'                  => $data['salt'],
             'nonce'                 => $data['nonce'],
-            'passphrase'            => $passphrase,
+            // SECURITY: Passphrase should be in wp-config.php as NDK_LOGIN_KEY_PASSPHRASE
+            // Only store it in DB if constant not defined (backward compat)
         );
+
+        // Only store passphrase in DB if constant not defined (backward compat)
+        if ( ! defined( 'NDK_LOGIN_KEY_PASSPHRASE' ) ) {
+            $site_keys['passphrase'] = $passphrase;
+        }
 
         update_option( 'ndk_site_login_keys', $site_keys );
 
@@ -157,9 +173,22 @@ class NDK_Login_Encryption {
      * AJAX: Handle encrypted login
      */
     public function ajax_encrypted_login() {
+        // SECURITY: Validate request method
+        if ( $_SERVER['REQUEST_METHOD'] !== 'POST' ) {
+            wp_send_json_error( array( 'message' => 'Login failed.' ) );
+        }
+
+        // SECURITY: Rate limiting
+        $ip = isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : '0.0.0.0';
+        $rate_limit = NDK_Security::check_login_rate_limit( $ip );
+        if ( ! $rate_limit['allowed'] ) {
+            wp_send_json_error( array( 'message' => $rate_limit['message'] ) );
+        }
+
         // Verify nonce
         if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( $_POST['nonce'], 'ndk-login-encryption' ) ) {
-            wp_send_json_error( array( 'message' => 'Invalid nonce' ) );
+            NDK_Security::record_login_attempt( $ip, false );
+            wp_send_json_error( array( 'message' => 'Login failed.' ) );
         }
 
         // Get encrypted credentials
@@ -168,7 +197,8 @@ class NDK_Login_Encryption {
         $remember = isset( $_POST['remember'] ) && $_POST['remember'] === 'true';
 
         if ( ! $encrypted_username || ! $encrypted_password ) {
-            wp_send_json_error( array( 'message' => 'Missing credentials' ) );
+            NDK_Security::record_login_attempt( $ip, false );
+            wp_send_json_error( array( 'message' => 'Login failed.' ) );
         }
 
         // Decrypt credentials
@@ -176,7 +206,8 @@ class NDK_Login_Encryption {
         $password = $this->decrypt_credential( $encrypted_password );
 
         if ( ! $username || ! $password ) {
-            wp_send_json_error( array( 'message' => 'Failed to decrypt credentials' ) );
+            NDK_Security::record_login_attempt( $ip, false );
+            wp_send_json_error( array( 'message' => 'Login failed.' ) );
         }
 
         // Authenticate
@@ -189,12 +220,14 @@ class NDK_Login_Encryption {
         $user = wp_signon( $creds, is_ssl() );
 
         if ( is_wp_error( $user ) ) {
-            wp_send_json_error( array(
-                'message' => $user->get_error_message(),
-            ) );
+            // SECURITY: Generic error message, don't leak details
+            NDK_Security::record_login_attempt( $ip, false );
+            wp_send_json_error( array( 'message' => 'Login failed.' ) );
         }
 
-        // Success - return redirect URL
+        // Success - clear rate limit
+        NDK_Security::record_login_attempt( $ip, true );
+
         $redirect_to = isset( $_POST['redirect_to'] ) ? esc_url_raw( $_POST['redirect_to'] ) : admin_url();
 
         wp_send_json_success( array(
@@ -213,14 +246,23 @@ class NDK_Login_Encryption {
             return false;
         }
 
+        // Get passphrase from constant or fallback to option
+        $passphrase = NDK_Security::get_login_key_passphrase();
+        if ( ! $passphrase ) {
+            error_log( 'WP-KyberCrypt: No login key passphrase configured' );
+            return false;
+        }
+
         $api = NDK()->get_api_client();
 
         // Unlock private key
-        $unlock_result = $api->unlock_private_key(
+        // NOTE: In production, passphrase should be in Python service ENV
+        // and not sent over HTTP
+        $unlock_result = $api->unlock_keypair(
             $site_keys['encrypted_private_key'],
-            $site_keys['passphrase'],
             $site_keys['salt'],
-            $site_keys['nonce']
+            $site_keys['nonce'],
+            $passphrase
         );
 
         if ( ! $unlock_result['success'] ) {
@@ -232,8 +274,12 @@ class NDK_Login_Encryption {
 
         // Decrypt the credential
         $decrypt_result = $api->decrypt(
-            $encrypted_data['ciphertext'],
-            $private_key
+            $private_key,
+            $encrypted_data['kem_ciphertext'],
+            $encrypted_data['wrapped_key'],
+            $encrypted_data['wrap_nonce'],
+            $encrypted_data['body_nonce'],
+            $encrypted_data['ciphertext']
         );
 
         if ( ! $decrypt_result['success'] ) {
@@ -258,6 +304,68 @@ class NDK_Login_Encryption {
     public static function regenerate_site_keypair() {
         $instance = new self();
         return $instance->generate_site_keypair();
+    }
+
+    /**
+     * Block classic wp-login.php if force_quantum_login is enabled
+     */
+    public function block_classic_login() {
+        // Only enforce if option is enabled
+        if ( ! get_option( 'ndk_force_quantum_login', false ) ) {
+            return;
+        }
+
+        // Allow AJAX requests (for our encrypted login endpoint)
+        if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
+            return;
+        }
+
+        // If this is a classic login POST (username/password fields present)
+        if ( isset( $_POST['log'] ) || isset( $_POST['pwd'] ) ) {
+            wp_die(
+                '<h1>Quantum-Safe Login Required</h1>' .
+                '<p>This site requires quantum-safe encrypted authentication. Classic username/password login is disabled.</p>' .
+                '<p><a href="' . esc_url( wp_login_url() ) . '">← Back to Login</a></p>',
+                'Quantum Login Required',
+                array( 'response' => 403 )
+            );
+        }
+    }
+
+    /**
+     * Block XML-RPC when force_quantum_login is enabled
+     */
+    public function block_xmlrpc_when_quantum_forced( $enabled ) {
+        if ( get_option( 'ndk_force_quantum_login', false ) ) {
+            return false;
+        }
+        return $enabled;
+    }
+
+    /**
+     * Block REST API basic auth when force_quantum_login is enabled
+     */
+    public function block_rest_basic_auth( $result ) {
+        // Only enforce if option is enabled
+        if ( ! get_option( 'ndk_force_quantum_login', false ) ) {
+            return $result;
+        }
+
+        // If already authenticated (e.g., via session), allow
+        if ( is_user_logged_in() ) {
+            return $result;
+        }
+
+        // Check if HTTP Basic Auth is being attempted
+        if ( isset( $_SERVER['PHP_AUTH_USER'] ) || isset( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
+            return new WP_Error(
+                'rest_quantum_login_required',
+                'Quantum-safe authentication required. Basic auth is disabled.',
+                array( 'status' => 403 )
+            );
+        }
+
+        return $result;
     }
 
     /**

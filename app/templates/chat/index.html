@@ -174,9 +174,13 @@
           <label for="chat-body" class="sr-only">Message body</label>
           <textarea id="chat-body" name="body" rows="3" maxlength="{{ max_message_length|default(4000) }}" required placeholder="Type your encrypted message…"></textarea>
           <div class="chat-compose-actions">
-            <button type="button" class="btn btn-secondary emoji-picker-btn" data-emoji-picker-btn title="Add emoji">😊</button>
-            <button type="button" class="btn btn-secondary gif-picker-btn" data-gif-picker-btn>GIF</button>
-            <button type="submit" class="btn btn-primary">Send Encrypted Message</button>
+            <button type="button" class="chat-icon-btn emoji-picker-btn" data-emoji-picker-btn title="Add emoji">
+              <span class="emoji-icon">😊</span>
+            </button>
+            <button type="button" class="chat-icon-btn gif-picker-btn" data-gif-picker-btn title="Add GIF">
+              <span class="gif-icon">🎬</span>
+            </button>
+            <button type="submit" class="btn btn-primary chat-send-btn">Send Encrypted Message</button>
           </div>
         </form>
       {% else %}
@@ -215,7 +219,7 @@
 
 {% block extra_scripts %}
 {% if state == "ready" or state == "locked" %}
-<script src="{{ url_for('static', filename='js/emoji_picker.js') }}?v=20251024"></script>
-<script src="{{ url_for('static', filename='js/giphy.js') }}?v=20251024"></script>
+<script src="{{ url_for('static', filename='js/emoji_picker.js') }}?v=20251026"></script>
+<script src="{{ url_for('static', filename='js/giphy.js') }}?v=20251026"></script>
 {% endif %}
 {% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Set Up Encryption</h1>
+<div class="card">
+  <p>Before you can send encrypted messages, you need to generate your encryption keys.</p>
+  <p>You'll create a passphrase that protects your private key. <strong>This passphrase is required to unlock your messages, so choose something memorable!</strong></p>
+</div>
+
+<form method="post" class="card form">
+  <label>
+    encryption passphrase
+    <input type="password" name="passphrase" required autofocus minlength="12" placeholder="At least 12 characters">
+  </label>
+  <label>
+    confirm passphrase
+    <input type="password" name="confirm_passphrase" required minlength="12">
+  </label>
+  <button type="submit" class="button">Generate Keys</button>
+</form>
+
+<div class="card">
+  <h3>Important</h3>
+  <ul>
+    <li>Your passphrase must be at least 12 characters</li>
+    <li>If you forget your passphrase, you cannot decrypt your messages</li>
+    <li>Your keys are protected with ML-KEM-768 (Kyber) quantum-resistant encryption</li>
+  </ul>
+</div>
+
+<p><a href="{{ url_for('wspr.logout') }}">← Log out</a></p>
+{% endblock %}

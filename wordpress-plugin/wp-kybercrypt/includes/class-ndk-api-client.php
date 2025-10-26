@@ -25,14 +25,38 @@ class NDK_API_Client {
      * Constructor
      */
     public function __construct() {
-        $this->api_url = get_option( 'ndk_api_url', 'https://awen01.cc' );
-        $this->api_key = get_option( 'ndk_api_key', '' );
+        // Use security helper to get API URL and key from constants or options
+        $this->api_url = NDK_Security::get_api_url();
+        $this->api_key = NDK_Security::get_api_key();
+
+        // Validate API URL for security
+        $validation = NDK_Security::validate_api_url( $this->api_url );
+        if ( ! $validation['valid'] ) {
+            error_log( 'WP-KyberCrypt API URL validation failed: ' . $validation['error'] );
+            add_action( 'admin_notices', function() use ( $validation ) {
+                echo '<div class="notice notice-error"><p><strong>WP-KyberCrypt Security Warning:</strong> ' . esc_html( $validation['error'] ) . '</p></div>';
+            } );
+        } elseif ( isset( $validation['warning'] ) ) {
+            error_log( 'WP-KyberCrypt API URL warning: ' . $validation['warning'] );
+            add_action( 'admin_notices', function() use ( $validation ) {
+                echo '<div class="notice notice-warning"><p><strong>WP-KyberCrypt Security Notice:</strong> ' . esc_html( $validation['warning'] ) . '</p></div>';
+            } );
+        }
     }
 
     /**
      * Make API request
      */
     private function request( $endpoint, $method = 'GET', $data = null ) {
+        // Validate URL before making request
+        $validation = NDK_Security::validate_api_url( $this->api_url );
+        if ( ! $validation['valid'] ) {
+            return array(
+                'success' => false,
+                'error'   => 'API URL validation failed: ' . $validation['error'],
+            );
+        }
+
         $url = trailingslashit( $this->api_url ) . 'api/v1/kyber/' . ltrim( $endpoint, '/' );
 
         $args = array(
@@ -56,6 +80,8 @@ class NDK_API_Client {
         $response = wp_remote_request( $url, $args );
 
         if ( is_wp_error( $response ) ) {
+            $error_msg = NDK_Security::sanitize_log( $response->get_error_message() );
+            error_log( 'WP-KyberCrypt API request failed: ' . $error_msg );
             return array(
                 'success' => false,
                 'error'   => $response->get_error_message(),
@@ -73,9 +99,12 @@ class NDK_API_Client {
             );
         }
 
+        $error_msg = isset( $decoded['error'] ) ? $decoded['error'] : 'Unknown error';
+        error_log( 'WP-KyberCrypt API error ' . $status_code . ': ' . NDK_Security::sanitize_log( $error_msg ) );
+
         return array(
             'success' => false,
-            'error'   => isset( $decoded['error'] ) ? $decoded['error'] : 'Unknown error',
+            'error'   => $error_msg,
             'code'    => $status_code,
         );
     }
@@ -101,14 +130,23 @@ class NDK_API_Client {
 
     /**
      * Unlock private key
+     *
+     * SECURITY NOTE: Passphrase should NOT be sent over HTTP.
+     * This method should be updated to send only encrypted_private_key, salt, nonce
+     * and the Python service should get passphrase from its own environment.
      */
-    public function unlock_keypair( $encrypted_private_key, $salt, $nonce, $passphrase ) {
+    public function unlock_keypair( $encrypted_private_key, $salt, $nonce, $passphrase = null ) {
         $data = array(
             'encrypted_private_key' => $encrypted_private_key,
             'salt'                  => $salt,
             'nonce'                 => $nonce,
-            'passphrase'            => $passphrase,
         );
+
+        // DEPRECATED: Sending passphrase over HTTP is insecure
+        // TODO: Update Python service to use passphrase from ENV
+        if ( $passphrase !== null ) {
+            $data['passphrase'] = $passphrase;
+        }
 
         return $this->request( 'keypair/unlock', 'POST', $data );
     }

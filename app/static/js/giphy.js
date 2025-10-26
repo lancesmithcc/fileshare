@@ -1,28 +1,56 @@
 (() => {
-  const gifPickerBtn = document.querySelector('[data-gif-picker-btn]');
   const gifPickerModal = document.querySelector('[data-gif-picker-modal]');
   const gifPickerOverlay = document.querySelector('[data-gif-picker-overlay]');
   const gifPickerClose = document.querySelector('[data-gif-picker-close]');
   const gifSearchInput = document.querySelector('[data-gif-search-input]');
   const gifResultsContainer = document.querySelector('[data-gif-results]');
 
-  if (!gifPickerBtn || !gifPickerModal || !gifPickerOverlay || !gifPickerClose || !gifSearchInput || !gifResultsContainer) {
+  if (!gifPickerModal || !gifPickerOverlay || !gifPickerClose || !gifSearchInput || !gifResultsContainer) {
     return;
   }
 
   let searchTimeout;
+  let currentTextarea = null;
 
-  gifPickerBtn.addEventListener('click', () => {
-    gifPickerModal.style.display = 'block';
-    gifSearchInput.focus();
+  // Use event delegation for dynamically created buttons
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-gif-picker-btn]');
+    if (btn) {
+      e.preventDefault();
+      // Find the nearest textarea
+      const form = btn.closest('form');
+      currentTextarea = form ? form.querySelector('textarea') : null;
+
+      // Check if button is inside messenger popover
+      const messengerTray = btn.closest('[data-messenger-tray]');
+
+      if (messengerTray) {
+        // Position inside the popover
+        gifPickerModal.classList.add('in-popover');
+        // Append to messenger tray temporarily
+        messengerTray.appendChild(gifPickerModal);
+      } else {
+        // Position on page
+        gifPickerModal.classList.remove('in-popover');
+        // Make sure it's back in the body
+        if (gifPickerModal.parentElement !== document.body) {
+          document.body.appendChild(gifPickerModal);
+        }
+      }
+
+      gifPickerModal.style.display = 'block';
+      gifSearchInput.focus();
+    }
   });
 
   gifPickerOverlay.addEventListener('click', () => {
     gifPickerModal.style.display = 'none';
+    currentTextarea = null;
   });
 
   gifPickerClose.addEventListener('click', () => {
     gifPickerModal.style.display = 'none';
+    currentTextarea = null;
   });
 
   gifSearchInput.addEventListener('input', () => {
@@ -63,9 +91,9 @@
       img.alt = gif.title;
       img.classList.add('gif-preview');
       img.addEventListener('click', () => {
-        const composeTextarea = document.querySelector('.chat-compose textarea');
-        if (composeTextarea) {
-          composeTextarea.value += `[GIF: ${gif.url}]`;
+        if (currentTextarea) {
+          currentTextarea.value += `[GIF: ${gif.url}]`;
+          currentTextarea.focus();
           gifPickerModal.style.display = 'none';
         }
       });

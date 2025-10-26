@@ -1382,7 +1382,15 @@
       <form class="chat-popover-compose" data-popover-form>
         <input type="hidden" name="thread_id" value="${threadId}">
         <textarea name="body" rows="2" placeholder="Type a message…" maxlength="${maxLength || 2000}" required></textarea>
-        <button type="submit" class="btn btn-primary btn-compact">Send</button>
+        <div class="chat-compose-actions">
+          <button type="button" class="chat-icon-btn emoji-picker-btn" data-emoji-picker-btn title="Add emoji">
+            <span class="emoji-icon">😊</span>
+          </button>
+          <button type="button" class="chat-icon-btn gif-picker-btn" data-gif-picker-btn title="Add GIF">
+            <span class="gif-icon">🎬</span>
+          </button>
+          <button type="submit" class="btn btn-primary btn-compact chat-send-btn">Send</button>
+        </div>
       </form>
     `;
     windowRail.append(container);

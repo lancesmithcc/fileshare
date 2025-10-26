@@ -95,6 +95,24 @@
       color: var(--text-primary);
       font-weight: 700;
       letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .header-logo {
+      width: 64px;
+      height: 64px;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 768px) {
+      .header-logo {
+        width: 48px;
+        height: 48px;
+      }
     }
 
     .tagline {
@@ -377,7 +395,10 @@
 
   <div class="container">
     <header class="header">
-      <h1>WP-KyberCrypt</h1>
+      <h1>
+        <img src="{{ url_for('static', filename='img/kyber-logo.svg') }}" alt="Kyber Logo" class="header-logo">
+        <span>WP-KyberCrypt</span>
+      </h1>
       <p class="tagline">Complete quantum-safe encryption for WordPress using ML-KEM-768 post-quantum cryptography</p>
       <div class="download-buttons">
         <a href="{{ url_for('files.download_wordpress_kyber') }}" class="btn btn-primary">Download v1.0.0 (21 KB)</a>

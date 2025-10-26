@@ -97,10 +97,9 @@
   <aside class="sidebar">
     
     <section class="card">
-      <h2>Circle Filter</h2>
       <form method="get" action="{{ url_for('social.feed') }}" class="form">
         <label>
-          Circle
+          circle
           <select name="circle">
             <option value="">All One Circle</option>
             {% for circle in circles %}
@@ -117,14 +116,14 @@
     <section class="card archdruid-card">
       <div class="archdruid-heading">
         <div>
-          <h2>Archdruid</h2>
+          
         </div>
         <span class="archdruid-pulse" aria-hidden="true"></span>
       </div>
       <form id="insight-form" class="form archdruid-form" novalidate>
         <label class="archdruid-prompt">
-          Question for the grove
-          <textarea name="prompt" rows="3" required placeholder="Suggest a solstice ritual..."></textarea>
+        
+          <textarea name="prompt" rows="3" required placeholder="ask anything"></textarea>
         </label>
         <button type="submit" class="button archdruid-button" data-state="idle">
           <span class="button-label">Ask the Grove</span>
