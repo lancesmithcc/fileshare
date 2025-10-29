@@ -968,6 +968,19 @@ def _create_group_thread(name: str, member_ids: list[int]) -> tuple[ChatThread |
     if len(members) != len(unique_member_ids):
         return None, "Some selected members are unavailable.", "danger"
 
+    # Validate that all members have chat keys
+    missing_keys = [
+        member.username
+        for member in members
+        if not member.has_chat_keys
+    ]
+    if missing_keys:
+        return (
+            None,
+            f"These members must unlock whispers first: {', '.join(missing_keys)}",
+            "warning",
+        )
+
     thread = ChatThread(
         type="group",
         title=name.strip() or "Grove Room",
@@ -1257,6 +1270,95 @@ def kick_member(thread_id: int, user_id: int):
     return redirect(url_for("chat.index", thread=thread_id))
 
 
+@chat_bp.route("/threads/<int:thread_id>/add-member", methods=["POST"])
+@login_required
+def add_member(thread_id: int):
+    is_async = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    thread = _load_thread_for_user(thread_id)
+    if thread is None:
+        if is_async:
+            return jsonify({"ok": False, "error": "That whisper is no longer available."}), 404
+        flash("That whisper is no longer available.", "warning")
+        return redirect(url_for("chat.index"))
+
+    if thread.type != "group":
+        if is_async:
+            return jsonify({"ok": False, "error": "Only group channels support adding members."}), 400
+        flash("Only group channels support adding members.", "warning")
+        return redirect(url_for("chat.index", thread=thread.id))
+
+    if thread.creator_id != current_user.id:
+        message = "Only the group founder can add members."
+        if is_async:
+            return jsonify({"ok": False, "error": message}), 403
+        flash(message, "warning")
+        return redirect(url_for("chat.index", thread=thread.id))
+
+    user_id = request.form.get("user_id", type=int)
+    if not user_id:
+        if is_async:
+            return jsonify({"ok": False, "error": "No user specified."}), 400
+        flash("No user specified.", "warning")
+        return redirect(url_for("chat.index", thread=thread.id))
+
+    # Check if user is already a member
+    existing_membership = (
+        ChatThreadMember.query.filter(
+            ChatThreadMember.thread_id == thread.id,
+            ChatThreadMember.user_id == user_id,
+        )
+        .limit(1)
+        .one_or_none()
+    )
+    if existing_membership:
+        if is_async:
+            return jsonify({"ok": False, "error": "That user is already in this group."}), 400
+        flash("That user is already in this group.", "warning")
+        return redirect(url_for("chat.index", thread=thread.id))
+
+    # Check current member count
+    current_member_count = (
+        ChatThreadMember.query.filter(ChatThreadMember.thread_id == thread.id).count()
+    )
+    if current_member_count >= GROUP_MEMBER_LIMIT:
+        message = f"Group channels are limited to {GROUP_MEMBER_LIMIT} members."
+        if is_async:
+            return jsonify({"ok": False, "error": message}), 400
+        flash(message, "warning")
+        return redirect(url_for("chat.index", thread=thread.id))
+
+    # Load the user to add
+    new_user = User.query.get(user_id)
+    if not new_user or new_user.status != "active":
+        if is_async:
+            return jsonify({"ok": False, "error": "That user is not available."}), 404
+        flash("That user is not available.", "warning")
+        return redirect(url_for("chat.index", thread=thread.id))
+
+    # Check if the user has chat keys
+    if not new_user.has_chat_keys:
+        message = f"{new_user.username} must unlock whispers before joining a group."
+        if is_async:
+            return jsonify({"ok": False, "error": message}), 400
+        flash(message, "warning")
+        return redirect(url_for("chat.index", thread=thread.id))
+
+    # Add the member
+    new_membership = ChatThreadMember(
+        thread=thread,
+        user_id=new_user.id,
+        is_admin=False,
+    )
+    db.session.add(new_membership)
+    db.session.commit()
+
+    if is_async:
+        return jsonify({"ok": True, "thread_id": thread_id, "user_id": user_id})
+
+    flash(f"{new_user.username} has been added to the group.", "info")
+    return redirect(url_for("chat.index", thread=thread_id))
+
+
 @chat_bp.route("/threads/<int:thread_id>/delete", methods=["POST"])
 @login_required
 def delete_thread(thread_id: int):
@@ -1486,7 +1588,9 @@ def send():
         return redirect(url_for("chat.index", thread=thread.id))
 
     message = _persist_message(thread, current_user, body)
-    arch_message = _maybe_send_archdruid_reply(thread, current_user, body)
+    # AI disabled: model hangs/crashes, needs fixing separately
+    # arch_message = _maybe_send_archdruid_reply(thread, current_user, body)
+    arch_message = None
     db.session.commit()
     fresh_message = (
         ChatMessage.query.options(joinedload(ChatMessage.sender), selectinload(ChatMessage.keys))

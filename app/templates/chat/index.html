@@ -10,7 +10,8 @@
     <p>The grove is automatically provisioning your encrypted chat keys. Sign out and back in if this message remains.</p>
   </section>
 {% else %}
-  <div class="chat-shell"
+  <div class="chat-layout">
+    <div class="chat-shell"
        data-chat-root
        data-state="{{ state }}"
        data-ws-path="/chat/ws"
@@ -23,7 +24,16 @@
         <h2>Channels</h2>
         {% if state == "ready" %}
         <form action="{{ url_for('chat.lock') }}" method="post">
-          <button type="submit" class="linkish lock-link">Lock</button>
+          <button type="submit" class="chat-action-button chat-action-button--compact" title="Lock encrypted chat">
+            <span class="chat-action-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <rect x="5" y="11" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.6" fill="none" />
+                <path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                <circle cx="12" cy="16" r="1.4" fill="currentColor" />
+              </svg>
+            </span>
+            <span class="chat-action-label">Lock</span>
+          </button>
         </form>
         {% endif %}
       </div>
@@ -37,7 +47,20 @@
             <a href="{{ url_for('chat.index', thread=entry.thread.id) }}">
               <div class="chat-thread-title">
                 <span class="chat-thread-name">
-                  {% if entry.is_group %}👥{% else %}💬{% endif %}
+                  <span class="chat-thread-glyph" aria-hidden="true">
+                    {% if entry.is_group %}
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                      <circle cx="8" cy="10" r="3.2" stroke="currentColor" stroke-width="1.6" fill="none" />
+                      <circle cx="16" cy="10" r="3.2" stroke="currentColor" stroke-width="1.6" fill="none" />
+                      <path d="M3.8 18.5c0-2.13 1.72-3.85 3.85-3.85h0.7c2.13 0 3.85 1.72 3.85 3.85" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                      <path d="M12.8 18.5c0-2.13 1.72-3.85 3.85-3.85h0.7c2.13 0 3.85 1.72 3.85 3.85" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                    </svg>
+                    {% else %}
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                      <path d="M5 5.5h14a2.5 2.5 0 0 1 2.5 2.5v6a2.5 2.5 0 0 1-2.5 2.5h-6l-4.5 4v-4H5A2.5 2.5 0 0 1 2.5 14V8A2.5 2.5 0 0 1 5 5.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="none" />
+                    </svg>
+                    {% endif %}
+                  </span>
                   {{ entry.display_name }}
                 </span>
                 {% if entry.last_at %}
@@ -60,7 +83,17 @@
 
       <div class="chat-sidebar-actions">
         <details>
-          <summary>New Direct Message</summary>
+          <summary>
+            <span class="chat-summary-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M5 5.5h9.5A3.5 3.5 0 0 1 18 9v0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                <path d="M5 5.5h14a2.5 2.5 0 0 1 2.5 2.5v6a2.5 2.5 0 0 1-2.5 2.5h-5.5L9 21v-4H5A2.5 2.5 0 0 1 2.5 14V8A2.5 2.5 0 0 1 5 5.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="none" />
+                <path d="M16 3.5v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                <path d="M14 5.5h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+              </svg>
+            </span>
+            <span>New Direct Message</span>
+          </summary>
           <form action="{{ url_for('chat.start_dm') }}" method="post" class="stacked-form">
             <label for="dm-recipient">Member</label>
             <select id="dm-recipient" name="recipient_id" required>
@@ -73,7 +106,19 @@
           </form>
         </details>
         <details>
-          <summary>Create Group Room</summary>
+          <summary>
+            <span class="chat-summary-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <circle cx="8" cy="9.5" r="3" stroke="currentColor" stroke-width="1.6" fill="none" />
+                <circle cx="16" cy="9.5" r="3" stroke="currentColor" stroke-width="1.6" fill="none" />
+                <path d="M3.5 17c0-1.93 1.57-3.5 3.5-3.5h1c1.93 0 3.5 1.57 3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                <path d="M12.5 17c0-1.93 1.57-3.5 3.5-3.5h1c1.93 0 3.5 1.57 3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                <path d="M12 6v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                <path d="M10 8h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+              </svg>
+            </span>
+            <span>Create Group Room</span>
+          </summary>
           <form action="{{ url_for('chat.create_group') }}" method="post" class="stacked-form">
             <label for="group-name">Room name</label>
             <input id="group-name" name="name" type="text" maxlength="120" placeholder="Moonlit Council">
@@ -126,25 +171,61 @@
           </div>
           <div class="chat-window-actions">
             {% if selected_thread.is_group %}
-              {% if selected_thread.thread.creator_id == current_user.id %}
-              <button type="button" class="ghost-button danger-button" data-thread-action="delete" data-thread-id="{{ selected_thread.thread.id }}">
-                Delete Group
-              </button>
-              {% else %}
-              <button type="button" class="ghost-button" data-thread-action="leave" data-thread-id="{{ selected_thread.thread.id }}">
-                Leave Group
-              </button>
-              {% endif %}
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                {% if selected_thread.thread.creator_id == current_user.id %}
+                <button type="button" class="ghost-button chat-action-button" data-add-members data-thread-id="{{ selected_thread.thread.id }}">
+                  <span class="chat-action-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                      <path d="M12 5v10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                      <path d="M7 10h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                    </svg>
+                  </span>
+                  <span class="chat-action-label">Add Members</span>
+                </button>
+                <button type="button" class="ghost-button danger-button chat-action-button" data-thread-action="delete" data-thread-id="{{ selected_thread.thread.id }}">
+                  <span class="chat-action-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                      <path d="M6 7h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                      <path d="M10 4h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                      <path d="M8.5 7v11a1.5 1.5 0 0 0 1.5 1.5h4a1.5 1.5 0 0 0 1.5-1.5V7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                    </svg>
+                  </span>
+                  <span class="chat-action-label">Delete Group</span>
+                </button>
+                {% else %}
+                <button type="button" class="ghost-button chat-action-button" data-thread-action="leave" data-thread-id="{{ selected_thread.thread.id }}">
+                  <span class="chat-action-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                      <path d="M14.5 16l4-4-4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                      <path d="M4 12h14.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                    </svg>
+                  </span>
+                  <span class="chat-action-label">Leave Group</span>
+                </button>
+                {% endif %}
+              </div>
             {% else %}
               {% if blocked_user_id %}
-              <button type="button" class="ghost-button" data-unblock-user data-user-id="{{ blocked_user_id }}">
-                Unblock User
+              <button type="button" class="ghost-button chat-action-button" data-unblock-user data-user-id="{{ blocked_user_id }}">
+                <span class="chat-action-icon" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M7 17l10-10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                    <circle cx="12" cy="12" r="7" stroke="currentColor" stroke-width="1.6" fill="none" />
+                  </svg>
+                </span>
+                <span class="chat-action-label">Unblock User</span>
               </button>
               {% else %}
                 {% set other_user = selected_thread_members | selectattr('id', 'ne', current_user.id) | first %}
                 {% if other_user %}
-                <button type="button" class="ghost-button danger-button" data-block-user data-user-id="{{ other_user.id }}">
-                  Block User
+                <button type="button" class="ghost-button danger-button chat-action-button" data-block-user data-user-id="{{ other_user.id }}">
+                  <span class="chat-action-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="7" stroke="currentColor" stroke-width="1.6" fill="none" />
+                      <path d="M7 17l10-10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                    </svg>
+                  </span>
+                  <span class="chat-action-label">Block User</span>
                 </button>
                 {% endif %}
               {% endif %}
@@ -226,12 +307,30 @@
             <div class="gif-picker-results" data-gif-results></div>
           </div>
         </div>
+
+        <!-- Add Members Modal (inside chat window) -->
+        {% if selected_thread.is_group and selected_thread.thread.creator_id == current_user.id %}
+        <div class="add-members-modal" data-add-members-modal style="display: none;">
+          <div class="add-members-overlay" data-add-members-overlay></div>
+          <div class="add-members-content">
+            <div class="add-members-header">
+              <h3>Add Members to Group</h3>
+              <button type="button" class="add-members-close" data-add-members-close>×</button>
+            </div>
+            <div class="add-members-body">
+              <input type="text" class="add-members-search" placeholder="Search users..." data-add-members-search>
+              <div class="add-members-results" data-add-members-results></div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
       {% else %}
         <div class="chat-placeholder">
           <p>Select or create a channel to begin an encrypted conversation.</p>
         </div>
       {% endif %}
     </section>
+    </div>
   </div>
 {% endif %}
 {% endblock %}

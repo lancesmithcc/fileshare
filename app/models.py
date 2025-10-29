@@ -390,6 +390,29 @@ class FileAsset(db.Model):
         return f"<FileAsset {self.original_name} ({self.id})>"
 
 
+class DocumentEmbedding(db.Model):
+    """Vector embeddings for Knowledge Garden files to enable RAG."""
+    __tablename__ = "document_embeddings"
+
+    id = db.Column(db.Integer, primary_key=True)
+    file_asset_id = db.Column(db.Integer, db.ForeignKey("file_assets.id", ondelete="CASCADE"), nullable=False, index=True)
+    chunk_index = db.Column(db.Integer, nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    # Vector column - will be created as vector(384) when pgvector is installed
+    # For now, store as JSON array until pgvector extension is enabled
+    embedding = db.Column(db.Text, nullable=False)  # JSON array of floats
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    file_asset = db.relationship("FileAsset", backref=db.backref("embeddings", cascade="all, delete-orphan", lazy="dynamic"))
+
+    __table_args__ = (
+        db.UniqueConstraint("file_asset_id", "chunk_index", name="uq_file_chunk"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<DocumentEmbedding file={self.file_asset_id} chunk={self.chunk_index}>"
+
+
 class NeodMint(db.Model):
     __tablename__ = "neod_mints"
 

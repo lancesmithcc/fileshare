@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from typing import Optional
 
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import login_required
@@ -17,6 +19,9 @@ logger = logging.getLogger(__name__)
 
 ai_bp = Blueprint("ai", __name__, url_prefix="/ai")
 _generation_pool = ThreadPoolExecutor(max_workers=2)
+
+# OpenAI client (lazy loaded)
+_openai_client = None
 
 
 def _fallback_insight(prompt: str) -> str:

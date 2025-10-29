@@ -11,10 +11,10 @@ pkill -f cloudflared
 sleep 2
 
 # Start Flask on port 8000 (matches Cloudflare tunnel config)
-echo "Starting Flask on port 8000..."
-nohup .venv/bin/python -m flask run --host=0.0.0.0 --port=8000 > logs/flask.log 2>&1 &
+echo "Starting Flask on port 8000 with threading enabled..."
+nohup .venv/bin/python -m flask run --host=0.0.0.0 --port=8000 --with-threads > logs/flask.log 2>&1 &
 FLASK_PID=$!
-echo "Flask started with PID: $FLASK_PID"
+echo "Flask started with PID: $FLASK_PID (threaded mode)"
 
 # Wait for Flask to start
 sleep 3

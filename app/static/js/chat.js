@@ -129,7 +129,17 @@
   }
 
   windowRail.addEventListener('submit', (event) => {
-    const form = event.target.closest('[data-popover-form]');
+    // Check if the event target is itself the form with data-popover-form
+    const targetIsPopoverForm = event.target.matches && event.target.matches('[data-popover-form]');
+    const form = targetIsPopoverForm ? event.target : event.target.closest('[data-popover-form]');
+
+    console.log('[chat] submit event:', {
+      target: event.target,
+      targetIsPopoverForm,
+      form,
+      hasAttribute: form && form.hasAttribute('data-popover-form')
+    });
+
     if (!form) {
       return;
     }
@@ -151,12 +161,12 @@
       let deleteScope = 'all';
       if (!isGroup) {
         // For one-on-one chats, ask user if they want to delete for self or both
-        const choice = window.confirm('Delete for both users?\n\nOK = Delete for both\nCancel = Delete for me only');
+        const choice = window.confirm('Delete this message?\n\nClick OK to delete for everyone\nClick Cancel to delete for you only');
         deleteScope = choice ? 'all' : 'self';
       } else {
-        if (!window.confirm('Delete this message?')) {
-          return;
-        }
+        // For group chats, ask with better wording
+        const choice = window.confirm('Delete this message?\n\nClick OK to delete for everyone\nClick Cancel to delete for you only');
+        deleteScope = choice ? 'all' : 'self';
       }
 
       deleteButton.disabled = true;
@@ -196,12 +206,12 @@
       let deleteScope = 'all';
       if (!isGroup) {
         // For one-on-one chats, ask user if they want to delete for self or both
-        const choice = window.confirm('Delete for both users?\n\nOK = Delete for both\nCancel = Delete for me only');
+        const choice = window.confirm('Delete this message?\n\nClick OK to delete for everyone\nClick Cancel to delete for you only');
         deleteScope = choice ? 'all' : 'self';
       } else {
-        if (!window.confirm('Delete this message?')) {
-          return;
-        }
+        // For group chats, ask with better wording
+        const choice = window.confirm('Delete this message?\n\nClick OK to delete for everyone\nClick Cancel to delete for you only');
+        deleteScope = choice ? 'all' : 'self';
       }
 
       deleteButton.disabled = true;
@@ -261,6 +271,16 @@
   });
 
   document.addEventListener('click', (event) => {
+    const maximizeButton = event.target.closest('[data-maximize-chat]');
+    if (maximizeButton) {
+      event.preventDefault();
+      const threadId = maximizeButton.dataset.threadId;
+      if (threadId) {
+        window.location.href = `/chat?thread=${threadId}`;
+      }
+      return;
+    }
+
     const blockButton = event.target.closest('[data-block-user]');
     if (blockButton) {
       event.preventDefault();
@@ -304,6 +324,17 @@
       return;
     }
 
+    const addMembersButton = event.target.closest('[data-add-members]');
+    if (addMembersButton) {
+      event.preventDefault();
+      const threadId = parseInt(addMembersButton.dataset.threadId || '', 10);
+      if (Number.isNaN(threadId)) {
+        return;
+      }
+      showAddMembersModal(threadId);
+      return;
+    }
+
     const actionButton = event.target.closest('[data-thread-action]');
     if (!actionButton) {
       return;
@@ -320,11 +351,64 @@
   wsPath = context.wsPath || '/chat/ws';
   connectSocket();
 
+  // Function to convert GIF markers to actual images (for server-rendered messages)
+  function processGifMarkers(element) {
+    const gifRegex = /\[GIF:\s*(https?:\/\/[^\]]+)\]/gi;
+    const messageBodyElements = element ? element.querySelectorAll('.chat-message-body') : document.querySelectorAll('.chat-message-body');
+
+    messageBodyElements.forEach(body => {
+      const text = body.textContent;
+      if (text.includes('[GIF:')) {
+        const html = text.replace(gifRegex, (_, url) => {
+          const cleanUrl = url.trim();
+          return `<img src="${cleanUrl}" alt="GIF" class="chat-gif" loading="lazy">`;
+        });
+        body.innerHTML = html;
+      }
+    });
+  }
+
   if (messageList) {
     messageList.scrollTop = messageList.scrollHeight;
     messageList.addEventListener('mouseenter', () => {
       if (currentThreadId != null) {
         clearUnread(currentThreadId);
+      }
+    });
+
+    // Process GIF markers on initial load
+    processGifMarkers();
+  }
+
+  // Add resize functionality to main chat window
+  const mainChatResize = document.querySelector('[data-main-chat-resize]');
+  const chatWindow = document.querySelector('.chat-window');
+  if (mainChatResize && chatWindow) {
+    let isResizing = false;
+    let startY = 0;
+    let startHeight = 0;
+
+    mainChatResize.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      startY = e.clientY;
+      startHeight = chatWindow.offsetHeight;
+      e.preventDefault();
+      document.body.style.userSelect = 'none';
+      chatWindow.classList.add('is-resizing');
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      const deltaY = e.clientY - startY;
+      const newHeight = Math.max(400, Math.min(900, startHeight + deltaY));
+      chatWindow.style.height = `${newHeight}px`;
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isResizing) {
+        isResizing = false;
+        document.body.style.userSelect = '';
+        chatWindow.classList.remove('is-resizing');
       }
     });
   }
@@ -422,12 +506,8 @@
       return user.circle && String(user.circle.id) === selectedCircle;
     });
 
-    const availableIds = new Set(onlineUsers.map((user) => user.id));
-    Array.from(groupBuilderMembers).forEach((id) => {
-      if (!availableIds.has(id)) {
-        groupBuilderMembers.delete(id);
-      }
-    });
+    // Don't remove members from groupBuilderMembers - they may be offline users
+    // that were explicitly added via search
 
     const header = document.createElement('header');
     header.className = 'messenger-section-header';
@@ -457,7 +537,7 @@
 
       const allOption = document.createElement('option');
       allOption.value = 'all';
-      allOption.textContent = 'all one circles';
+      allOption.textContent = 'all one circle';
       if (selectedCircle === 'all') {
         allOption.selected = true;
       }
@@ -483,7 +563,7 @@
       if (!includesunaffiliated && onlineUsers.some((user) => !user.circle)) {
         const option = document.createElement('option');
         option.value = 'unaffiliated';
-        option.textContent = 'unaffiliated';
+        option.textContent = 'all one circle';
         if (selectedCircle === 'unaffiliated') {
           option.selected = true;
         }
@@ -771,7 +851,7 @@
       if (isOffline) {
         meta.textContent = user.circle ? `${user.circle.name} · offline` : 'Offline';
       } else {
-        meta.textContent = user.circle ? user.circle.name : 'unaffiliated';
+        meta.textContent = user.circle ? user.circle.name : 'all one circle';
       }
     } else {
       meta.textContent = 'Whispers locked';
@@ -809,78 +889,135 @@
 
     const hint = document.createElement('p');
     hint.className = 'messenger-group-hint';
-    hint.textContent = 'Invite members to start a shared whisper (online and offline).';
+    hint.textContent = 'Search and add members to start a shared whisper.';
     form.append(hint);
-
-    const membersWrap = document.createElement('div');
-    membersWrap.className = 'messenger-group-members';
 
     // Combine online and offline users for group creation
     const onlineIds = new Set(onlineUsers.map(u => u.id));
     const offlineFiltered = allRecipients.filter(u => !onlineIds.has(u.id));
     const allAvailableUsers = [...visibleUsers, ...offlineFiltered];
 
-    let selectableCount = 0;
-    allAvailableUsers.forEach((user) => {
-      const entry = document.createElement('label');
-      entry.className = 'messenger-group-member';
+    // Selected members chips container
+    const selectedChipsWrap = document.createElement('div');
+    selectedChipsWrap.className = 'messenger-group-selected';
 
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.value = String(user.id);
-      checkbox.checked = groupBuilderMembers.has(user.id);
-      checkbox.disabled = !user.has_chat_keys;
-      checkbox.addEventListener('change', (event) => {
-        const memberId = user.id;
-        if (event.target.checked) {
-          if (groupBuilderMembers.size >= GROUP_MEMBER_LIMIT - 1) {
-            groupBuilderError = `Group whispers are limited to ${GROUP_MEMBER_LIMIT} members.`;
-            event.target.checked = false;
-          } else {
-            groupBuilderMembers.add(memberId);
+    function renderSelectedChips() {
+      selectedChipsWrap.innerHTML = '';
+      if (groupBuilderMembers.size === 0) {
+        selectedChipsWrap.innerHTML = '<p class="muted" style="font-size: 13px; margin: 8px 0;">No members selected yet</p>';
+        return;
+      }
+      groupBuilderMembers.forEach(userId => {
+        const user = allAvailableUsers.find(u => u.id === userId);
+        if (!user) return;
+
+        const chip = document.createElement('div');
+        chip.className = 'messenger-group-chip';
+        chip.innerHTML = `
+          <span>${user.username}</span>
+          <button type="button" class="messenger-group-chip-remove" data-user-id="${userId}">×</button>
+        `;
+        chip.querySelector('.messenger-group-chip-remove').addEventListener('click', () => {
+          groupBuilderMembers.delete(userId);
+          renderTray();
+        });
+        selectedChipsWrap.append(chip);
+      });
+    }
+
+    renderSelectedChips();
+    form.append(selectedChipsWrap);
+
+    // Search input wrapper
+    const searchWrap = document.createElement('div');
+    searchWrap.className = 'messenger-group-search-wrap';
+
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'messenger-group-search';
+    searchInput.placeholder = 'Type to search users...';
+    searchWrap.append(searchInput);
+
+    const resultsWrap = document.createElement('div');
+    resultsWrap.className = 'messenger-group-search-results';
+    searchWrap.append(resultsWrap);
+
+    form.append(searchWrap);
+
+    // Search functionality
+    let searchTimeout;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      const query = searchInput.value.trim().toLowerCase();
+
+      if (!query) {
+        resultsWrap.innerHTML = '';
+        resultsWrap.style.display = 'none';
+        return;
+      }
+
+      searchTimeout = setTimeout(() => {
+        const matches = allAvailableUsers.filter(user => {
+          // Don't filter by has_chat_keys - allow adding all users
+          if (groupBuilderMembers.has(user.id)) return false;
+          return user.username.toLowerCase().includes(query);
+        });
+
+        if (matches.length === 0) {
+          resultsWrap.innerHTML = '<div class="messenger-group-search-empty">No users found</div>';
+          resultsWrap.style.display = 'block';
+          return;
+        }
+
+        resultsWrap.innerHTML = '';
+        matches.slice(0, 10).forEach(user => {
+          const result = document.createElement('div');
+          result.className = 'messenger-group-search-result';
+          if (!user.has_chat_keys) {
+            result.classList.add('is-locked');
+          }
+          const circleText = user.circle ? ` · ${user.circle.name}` : ' · all one circle';
+          const onlineStatus = onlineIds.has(user.id) ? '' : ' (offline)';
+          const lockStatus = !user.has_chat_keys ? ' 🔒' : '';
+          result.innerHTML = `
+            <span class="messenger-group-search-result-name">${user.username}${lockStatus}</span>
+            <span class="messenger-group-search-result-meta">${circleText}${onlineStatus}${!user.has_chat_keys ? ' · Whispers locked' : ''}</span>
+          `;
+          result.addEventListener('click', () => {
+            console.log('[chat] Adding user to group:', user.username, 'has_chat_keys:', user.has_chat_keys);
+            // Check if user has chat keys before adding
+            if (!user.has_chat_keys) {
+              alert(`${user.username} must unlock whispers before joining a group.`);
+              return;
+            }
+            if (groupBuilderMembers.size >= GROUP_MEMBER_LIMIT - 1) {
+              groupBuilderError = `Group whispers are limited to ${GROUP_MEMBER_LIMIT} members.`;
+              console.log('[chat] Group member limit reached');
+              renderTray();
+              return;
+            }
+            console.log('[chat] Adding user ID to group:', user.id);
+            groupBuilderMembers.add(user.id);
+            searchInput.value = '';
+            resultsWrap.innerHTML = '';
+            resultsWrap.style.display = 'none';
             if (groupBuilderError && groupBuilderError.startsWith('Group whispers are limited')) {
               groupBuilderError = '';
             }
-          }
-        } else {
-          groupBuilderMembers.delete(memberId);
-          if (groupBuilderError && groupBuilderMembers.size > 0) {
-            groupBuilderError = '';
-          }
-        }
-        renderTray();
-      });
-      entry.append(checkbox);
-
-      const descriptor = document.createElement('span');
-      descriptor.className = 'messenger-group-member-label';
-      const circleText = user.circle ? ` · ${user.circle.name}` : ' · unaffiliated';
-      const onlineStatus = onlineIds.has(user.id) ? '' : ' (offline)';
-      descriptor.textContent = user.username + circleText + onlineStatus;
-      entry.append(descriptor);
-
-      if (!checkbox.disabled) {
-        selectableCount += 1;
-      } else {
-        entry.classList.add('is-locked');
-      }
-
-      membersWrap.append(entry);
+            renderTray();
+          });
+          resultsWrap.append(result);
+        });
+        resultsWrap.style.display = 'block';
+      }, 200);
     });
 
-    if (!membersWrap.children.length) {
-      const empty = document.createElement('p');
-      empty.className = 'messenger-status';
-      empty.textContent = 'No members are available right now.';
-      membersWrap.append(empty);
-    } else if (!selectableCount) {
-      const note = document.createElement('p');
-      note.className = 'messenger-status';
-      note.textContent = 'Members must unlock whispers before joining a group.';
-      membersWrap.append(note);
-    }
-
-    form.append(membersWrap);
+    // Hide results when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!searchWrap.contains(e.target)) {
+        resultsWrap.style.display = 'none';
+      }
+    });
 
     if (groupBuilderError) {
       const errorMsg = document.createElement('p');
@@ -1375,6 +1512,157 @@
     }
   }
 
+  function showAddMembersModal(threadId) {
+    // Try to find modal in chat popover first, then in main chat window
+    const popover = document.querySelector(`[data-chat-window="${threadId}"]`);
+    const modal = popover
+      ? popover.querySelector('[data-add-members-modal]')
+      : document.querySelector('[data-add-members-modal]');
+
+    if (!modal) {
+      return;
+    }
+
+    modal.style.display = 'block';
+    modal.dataset.threadId = threadId;
+
+    const searchInput = modal.querySelector('[data-add-members-search]');
+    const resultsDiv = modal.querySelector('[data-add-members-results]');
+    const closeButton = modal.querySelector('[data-add-members-close]');
+    const overlay = modal.querySelector('[data-add-members-overlay]');
+
+    if (searchInput) {
+      searchInput.value = '';
+      searchInput.focus();
+    }
+    if (resultsDiv) {
+      resultsDiv.innerHTML = '<p class="add-members-empty">Type to search for members to add</p>';
+    }
+
+    const hideModal = () => {
+      modal.style.display = 'none';
+      if (searchInput) searchInput.value = '';
+      if (resultsDiv) resultsDiv.innerHTML = '';
+    };
+
+    if (closeButton) {
+      closeButton.onclick = hideModal;
+    }
+    if (overlay) {
+      overlay.onclick = hideModal;
+    }
+
+    if (searchInput) {
+      let searchTimeout;
+      searchInput.oninput = () => {
+        clearTimeout(searchTimeout);
+        const query = searchInput.value.trim().toLowerCase();
+
+        if (!query) {
+          resultsDiv.innerHTML = '<p class="add-members-empty">Type to search for members to add</p>';
+          return;
+        }
+
+        searchTimeout = setTimeout(() => searchAddMembers(threadId, query, resultsDiv), 300);
+      };
+    }
+  }
+
+  async function searchAddMembers(threadId, query, resultsDiv) {
+    if (!resultsDiv) return;
+
+    resultsDiv.innerHTML = '<p class="add-members-empty">Searching...</p>';
+
+    try {
+      const response = await fetch(`/api/v1/users/search?q=${encodeURIComponent(query)}`);
+      if (!response.ok) {
+        resultsDiv.innerHTML = '<p class="add-members-empty">Error searching users</p>';
+        return;
+      }
+
+      const data = await response.json();
+      const users = data.users || [];
+
+      if (users.length === 0) {
+        resultsDiv.innerHTML = '<p class="add-members-empty">No users found</p>';
+        return;
+      }
+
+      resultsDiv.innerHTML = '';
+      users.slice(0, 10).forEach(user => {
+        const resultDiv = document.createElement('div');
+        resultDiv.className = 'add-member-result';
+        if (!user.has_chat_keys) {
+          resultDiv.classList.add('is-locked');
+        }
+
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'add-member-result-info';
+
+        const nameSpan = document.createElement('div');
+        nameSpan.className = 'add-member-result-name';
+        nameSpan.textContent = user.username + (!user.has_chat_keys ? ' 🔒' : '');
+
+        const metaSpan = document.createElement('div');
+        metaSpan.className = 'add-member-result-meta';
+        metaSpan.textContent = !user.has_chat_keys ? 'Whispers locked' : 'Available';
+
+        infoDiv.append(nameSpan, metaSpan);
+
+        if (user.has_chat_keys) {
+          const addBtn = document.createElement('button');
+          addBtn.className = 'add-member-result-btn';
+          addBtn.textContent = 'Add';
+          addBtn.onclick = () => addMemberToGroup(threadId, user.id);
+          resultDiv.append(infoDiv, addBtn);
+        } else {
+          resultDiv.append(infoDiv);
+        }
+
+        resultsDiv.append(resultDiv);
+      });
+    } catch (err) {
+      console.error('[chat] search add members failed', err);
+      resultsDiv.innerHTML = '<p class="add-members-empty">Error searching users</p>';
+    }
+  }
+
+  async function addMemberToGroup(threadId, userId) {
+    if (!threadId || !userId) {
+      return;
+    }
+
+    try {
+      const payload = new URLSearchParams();
+      payload.append('user_id', userId);
+
+      const response = await fetch(`/chat/threads/${threadId}/add-member`, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+        body: payload,
+      });
+
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        const error = (result && result.error) || 'Unable to add that member.';
+        window.alert(error);
+        return;
+      }
+
+      const modal = document.querySelector('[data-add-members-modal]');
+      if (modal) {
+        modal.style.display = 'none';
+      }
+
+      // Reload to show the new member
+      window.location.reload();
+    } catch (err) {
+      console.error('[chat] add member failed', err);
+      window.alert('Unable to add that member.');
+    }
+  }
+
   async function deleteMessage(threadId, messageId, scope = 'all') {
     if (!threadId || !messageId) {
       return;
@@ -1537,6 +1825,10 @@
       existing.container.classList.add('is-visible');
       return existing;
     }
+
+    const info = threadLookup.get(threadId);
+    const isGroupOwner = info && info.isGroup && info.ownerId === currentUserId;
+
     const container = document.createElement('div');
     container.className = 'chat-popover';
     container.dataset.chatWindow = String(threadId);
@@ -1544,7 +1836,11 @@
       <div class="chat-popover-resize-handle" data-resize-handle></div>
       <header class="chat-popover-header">
         <span class="chat-popover-title">${label || 'Conversation'}</span>
-        <button type="button" class="chat-popover-close" aria-label="Close">×</button>
+        <div class="chat-popover-header-actions">
+          ${isGroupOwner ? `<button type="button" class="chat-popover-add-members" data-add-members data-thread-id="${threadId}" title="Add members" aria-label="Add members">➕</button>` : ''}
+          <button type="button" class="chat-popover-maximize" data-maximize-chat data-thread-id="${threadId}" title="Open full screen" aria-label="Maximize">⛶</button>
+          <button type="button" class="chat-popover-close" aria-label="Close">×</button>
+        </div>
       </header>
       <section class="chat-popover-body" data-popover-messages></section>
       <form class="chat-popover-compose" data-popover-form>
@@ -1561,19 +1857,40 @@
         </div>
       </form>
     `;
+
+    // Add the add members modal if user is group owner
+    if (isGroupOwner) {
+      const modalHTML = `
+        <div class="add-members-modal" data-add-members-modal style="display: none;">
+          <div class="add-members-overlay" data-add-members-overlay></div>
+          <div class="add-members-content">
+            <div class="add-members-header">
+              <h3>Add Members to Group</h3>
+              <button type="button" class="add-members-close" data-add-members-close>×</button>
+            </div>
+            <div class="add-members-body">
+              <input type="text" class="add-members-search" placeholder="Search users..." data-add-members-search>
+              <div class="add-members-results" data-add-members-results></div>
+            </div>
+          </div>
+        </div>
+      `;
+      container.insertAdjacentHTML('beforeend', modalHTML);
+    }
+
     windowRail.append(container);
     requestAnimationFrame(() => container.classList.add('is-visible'));
-    const info = {
+    const windowInfo = {
       container,
       body: container.querySelector('[data-popover-messages]'),
       form: container.querySelector('[data-popover-form]'),
       messageIds: new Set(),
     };
-    if (info.form && !(info.form.getAttribute('action') || '').trim()) {
-      info.form.setAttribute('action', composeForm?.getAttribute('action') || '/chat/send');
+    if (windowInfo.form && !(windowInfo.form.getAttribute('action') || '').trim()) {
+      windowInfo.form.setAttribute('action', composeForm?.getAttribute('action') || '/chat/send');
     }
-    if (info.form) {
-      attachComposeShortcuts(info.form);
+    if (windowInfo.form) {
+      attachComposeShortcuts(windowInfo.form);
     }
 
     // Add resize functionality
@@ -1582,8 +1899,8 @@
       attachResizeHandler(container, resizeHandle);
     }
 
-    windowMap.set(threadId, info);
-    return info;
+    windowMap.set(threadId, windowInfo);
+    return windowInfo;
   }
 
   function attachResizeHandler(container, handle) {
@@ -1963,28 +2280,53 @@
   }
 
   async function submitForm(form) {
+    console.log('[chat] submitForm called with form:', form);
     const submitButton = form.querySelector('button[type="submit"]');
+    console.log('[chat] submitButton:', submitButton);
     if (submitButton) {
       submitButton.disabled = true;
     }
     try {
       const formData = new FormData(form);
-      const response = await fetch(form.getAttribute('action') || composeForm?.getAttribute('action') || '/chat/send', {
+      const action = form.getAttribute('action') || composeForm?.getAttribute('action') || '/chat/send';
+      console.log('[chat] submitting to:', action);
+      console.log('[chat] form data entries:', Array.from(formData.entries()));
+
+      // Create an AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const response = await fetch(action, {
         method: 'POST',
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'same-origin',
         body: formData,
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
+      console.log('[chat] response status:', response.status, response.statusText);
+
       if (response.ok) {
         const result = await response.json().catch(() => null);
+        console.log('[chat] response result:', result);
         if (result && result.ok) {
           form.reset();
         }
       } else if (response.status === 403) {
+        console.log('[chat] 403 forbidden, reloading...');
         window.location.reload();
+      } else {
+        console.warn('[chat] non-ok response:', response.status);
       }
     } catch (err) {
-      console.error('[chat] send failed', err);
+      if (err.name === 'AbortError') {
+        console.error('[chat] send timed out after 10 seconds');
+        window.alert('Message send timed out. Please try again.');
+      } else {
+        console.error('[chat] send failed', err);
+        window.alert('Failed to send message: ' + err.message);
+      }
     } finally {
       if (submitButton) {
         submitButton.disabled = false;

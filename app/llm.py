@@ -204,8 +204,14 @@ class ModelManager:
 
         completion_kwargs.update(extra_options)
 
+        # Use the same lock to serialize inference calls (llama-cpp-python is not thread-safe)
+        lock = self._locks.get(settings.name)
+        if lock is None:
+            lock = self._locks.setdefault(settings.name, Lock())
+
         try:
-            output = llm.create_chat_completion(**completion_kwargs)
+            with lock:
+                output = llm.create_chat_completion(**completion_kwargs)
         except Exception as exc:  # pylint: disable=broad-except
             logger.exception("Generation failed for model '%s'", model_name)
             raise InferenceError(

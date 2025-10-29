@@ -331,3 +331,49 @@ def giphy_search():
     except Exception as exc:
         logger.error("GIPHY search error: %s", exc)
         return jsonify({"error": "GIPHY unavailable"}), 503
+
+
+@api_bp.route("/users/search", methods=["GET"])
+def user_search():
+    """Search for users by username."""
+    from flask_login import current_user, login_required
+    from .models import User
+
+    # Check if user is logged in
+    if not current_user.is_authenticated:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    query = request.args.get("q", "").strip().lower()
+    if not query:
+        return jsonify({"error": "Query parameter 'q' required"}), 400
+
+    limit = min(int(request.args.get("limit", "20")), 50)
+
+    try:
+        # Search for users by username (case-insensitive)
+        users = (
+            User.query
+            .filter(User.status == "active")
+            .filter(User.username.ilike(f"%{query}%"))
+            .filter(User.id != current_user.id)  # Don't include current user
+            .limit(limit)
+            .all()
+        )
+
+        results = []
+        for user in users:
+            results.append({
+                "id": user.id,
+                "username": user.username,
+                "has_chat_keys": user.has_chat_keys,
+                "circle": {
+                    "id": user.circle.id,
+                    "name": user.circle.name
+                } if user.circle else None
+            })
+
+        return jsonify({"users": results})
+
+    except Exception as exc:
+        logger.error("User search error: %s", exc)
+        return jsonify({"error": "Search failed"}), 500

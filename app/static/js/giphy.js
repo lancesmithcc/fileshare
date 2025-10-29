@@ -36,11 +36,28 @@
 
   function positionPicker(trigger, registry) {
     const chatWindow = trigger.closest('.chat-window');
+    const popover = trigger.closest('.chat-popover');
     const tray = trigger.closest('[data-messenger-tray]');
 
-    if (chatWindow && chatWindow.contains(registry.modal)) {
+    if (chatWindow) {
+      // Main chat window - ensure modal is inside and add class
+      const modalInChat = chatWindow.querySelector('[data-gif-picker-modal]');
+      if (modalInChat && modalInChat !== registry.modal) {
+        // Use the modal that's already in the chat window
+        return;
+      }
+      if (registry.modal.parentElement !== chatWindow) {
+        chatWindow.appendChild(registry.modal);
+      }
       registry.modal.classList.add('in-chat');
       registry.modal.classList.remove('in-popover');
+    } else if (popover) {
+      // Chat popover window
+      if (registry.modal.parentElement !== popover) {
+        popover.appendChild(registry.modal);
+      }
+      registry.modal.classList.add('in-popover');
+      registry.modal.classList.remove('in-chat');
     } else if (tray) {
       registry.modal.classList.add('in-popover');
       registry.modal.classList.remove('in-chat');
@@ -158,7 +175,9 @@
       img.classList.add('gif-preview');
       img.addEventListener('click', () => {
         if (currentTextarea) {
-          currentTextarea.value += `[GIF: ${gif.url}]`;
+          // Insert a marker that will be converted to an image when displayed
+          const gifMarker = `[GIF:${gif.url}]`;
+          currentTextarea.value += gifMarker;
           currentTextarea.focus();
           hidePicker(activePicker);
         }
