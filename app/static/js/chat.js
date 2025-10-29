@@ -752,15 +752,39 @@
         openThread(threadId);
       });
 
-      const label = document.createElement('span');
-      label.className = 'messenger-tray-main';
-      label.textContent = `${info.isGroup ? '👥' : '💬'} ${info.label}`;
-      openButton.append(label);
+      const avatar = document.createElement('span');
+      avatar.className = 'messenger-tray-avatar';
+      if (info.isGroup) {
+        avatar.classList.add('is-group');
+        avatar.textContent = '👥';
+      } else {
+        const initial = (info.label || 'Direct Message').trim().charAt(0).toUpperCase();
+        avatar.textContent = initial || '💬';
+      }
+      openButton.append(avatar);
 
-      const preview = document.createElement('span');
-      preview.className = 'messenger-tray-preview';
-      preview.textContent = truncateBody(info.preview || '');
-      openButton.append(preview);
+      const textWrap = document.createElement('span');
+      textWrap.className = 'messenger-tray-text';
+
+      const headerRow = document.createElement('span');
+      headerRow.className = 'messenger-tray-row';
+
+      const titleWrap = document.createElement('span');
+      titleWrap.className = 'messenger-tray-title';
+
+      const nameLabel = document.createElement('span');
+      nameLabel.className = 'messenger-tray-main';
+      nameLabel.textContent = info.label || 'Conversation';
+      titleWrap.append(nameLabel);
+
+      if (info.isGroup) {
+        const badge = document.createElement('span');
+        badge.className = 'messenger-tray-badge';
+        badge.textContent = 'Group';
+        titleWrap.append(badge);
+      }
+
+      headerRow.append(titleWrap);
 
       const unread = document.createElement('span');
       unread.className = 'messenger-tray-unread';
@@ -769,7 +793,17 @@
       } else {
         unread.classList.add('is-hidden');
       }
-      openButton.append(unread);
+      headerRow.append(unread);
+
+      textWrap.append(headerRow);
+
+      const preview = document.createElement('span');
+      preview.className = 'messenger-tray-preview';
+      const previewText = truncateBody(info.preview || '');
+      preview.textContent = previewText || (info.isGroup ? 'No recent group messages yet.' : 'No recent messages yet.');
+      textWrap.append(preview);
+
+      openButton.append(textWrap);
 
       item.append(openButton);
 
@@ -780,7 +814,7 @@
       deleteButton.title = actionLabel;
       deleteButton.dataset.threadAction = actionType;
       deleteButton.dataset.threadId = String(threadId);
-      deleteButton.textContent = actionType === 'leave' ? '⤴' : '×';
+      deleteButton.innerHTML = actionType === 'leave' ? '&larr;' : '&times;';
       deleteButton.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();

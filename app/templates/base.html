@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ site_settings.site_title }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20251116">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20251120">
     {% if site_settings.custom_css %}
     <style id="custom-css">
       {{ site_settings.custom_css | safe }}
@@ -92,7 +92,7 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/chat_tone.js') }}?v=20251028d"></script>
-    <script src="{{ url_for('static', filename='js/chat.js') }}?v=20251028d"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}?v=20251120"></script>
     <script src="{{ url_for('static', filename='js/emoji_picker.js') }}?v=20251028d"></script>
     <script src="{{ url_for('static', filename='js/giphy.js') }}?v=20251028d"></script>
     {% endif %}

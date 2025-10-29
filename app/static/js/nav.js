@@ -38,6 +38,7 @@
         icon.innerHTML = isOpen ? CLOSE_ICON : OPEN_ICON;
       }
       syncAria();
+      links.style.pointerEvents = isOpen ? "auto" : "";
     };
 
     const closeMenu = () => setOpenState(false);
