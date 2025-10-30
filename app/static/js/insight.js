@@ -25,30 +25,8 @@ document.addEventListener("DOMContentLoaded", () => {
     clearTimeout(typingTimer);
     output.textContent = "";
 
-    const reduceMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-    const shouldAnimate = !reduceMotion && text.length <= 240;
-
-    if (!shouldAnimate) {
-      output.textContent = text;
-      return;
-    }
-
-    let index = 0;
-    const chunkSize = text.length > 120 ? 3 : 2;
-
-    const tick = () => {
-      if (index >= text.length) {
-        return;
-      }
-
-      output.textContent += text.slice(index, index + chunkSize);
-      index += chunkSize;
-      typingTimer = setTimeout(tick, 6);
-    };
-
-    tick();
+    // Show instantly for better perceived performance (matching chat speed)
+    output.textContent = text;
   };
 
   const showMessage = (message) => {
@@ -78,7 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
       showMessage(
         "This is taking longer than usual, but I'm still listening. Stay with me while I sift through the grove's whispers..."
       );
-    }, 12000);
+    }, 8000);
 
     try {
       const response = await fetch("/ai/insight", {

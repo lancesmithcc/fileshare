@@ -389,6 +389,71 @@ class FileAsset(db.Model):
     def __repr__(self) -> str:
         return f"<FileAsset {self.original_name} ({self.id})>"
 
+    @property
+    def display_name(self) -> str:
+        """Get the display name for this file."""
+        return self.original_name
+
+    @property
+    def physical_path(self) -> str:
+        """Get the full physical path to the stored file."""
+        from pathlib import Path
+        from flask import current_app
+
+        storage_root = current_app.config.get("STORAGE_ROOT", "storage")
+        return str(Path(storage_root) / self.stored_name)
+
+    def read_text_safe(self, encoding: str = "utf-8", max_size: int = 10 * 1024 * 1024) -> str:
+        """
+        Safely read file content as text with advanced extraction (PDFs, OCR, etc.).
+
+        Supports:
+        - Plain text files
+        - PDFs with text or scanned images (OCR)
+        - Images with text (OCR)
+        - Word documents (DOCX)
+
+        Args:
+            encoding: Text encoding to use (for plain text files)
+            max_size: Maximum file size to read (default 10MB)
+
+        Returns:
+            File content as string, or empty string if file cannot be read
+        """
+        from pathlib import Path
+        from .document_extractor import extract_text_from_file
+
+        try:
+            path = Path(self.physical_path)
+
+            if not path.exists():
+                return ""
+
+            # Check file size
+            file_size = path.stat().st_size
+            if file_size > max_size:
+                logger = __import__('logging').getLogger(__name__)
+                logger.warning(
+                    "File %s too large (%d bytes), truncating to %d",
+                    self.display_name,
+                    file_size,
+                    max_size
+                )
+
+            # Use advanced document extractor (handles PDFs, images, etc.)
+            text = extract_text_from_file(str(path), self.mime_type)
+
+            # Truncate if needed
+            if text and len(text) > max_size:
+                text = text[:max_size]
+
+            return text
+
+        except Exception as exc:
+            logger = __import__('logging').getLogger(__name__)
+            logger.error("Failed to read file %s: %s", self.display_name, exc)
+            return ""
+
 
 class DocumentEmbedding(db.Model):
     """Vector embeddings for Knowledge Garden files to enable RAG."""

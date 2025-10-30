@@ -859,7 +859,16 @@ def _maybe_send_archdruid_reply(thread: ChatThread, sender: User, body: str) -> 
         return None
     prompt = _generate_archdruid_prompt(sender, body, thread)
     try:
-        reply = (_model_insight(prompt) or "").strip()
+        reply, sources = _model_insight(prompt)
+        reply = (reply or "").strip()
+
+        # Append source links if available
+        if sources:
+            reply += "\n\n📚 Sources:"
+            for source in sources:
+                reply += f"\n• {source['name']} (relevance: {source['relevance']})"
+                reply += f" - /files/preview/{source['id']}"
+
     except Exception:
         current_app.logger.exception("Archdruid reply generation failed.")
         return None
@@ -1043,24 +1052,36 @@ def index():
     potential_group_members = [
         user for user in _available_users_for_selection() if user.has_chat_keys
     ]
+    active_recipient_ids = {member.id for member in active_recipients}
+    offline_recipients = [
+        member
+        for member in potential_group_members
+        if member.id not in active_recipient_ids
+    ]
 
     thread_ids = [summary.thread.id for summary in thread_summaries]
     current_thread_id = selected_summary.thread.id if selected_summary else None
     blocked_user_id = _get_blocked_user_id_for_dm(selected_thread) if selected_thread else None
+    direct_threads = [summary for summary in thread_summaries if not summary.is_group]
+    group_threads = [summary for summary in thread_summaries if summary.is_group]
 
     return render_template(
         "chat/index.html",
         state=state,
         threads=thread_summaries,
+        direct_threads=direct_threads,
+        group_threads=group_threads,
         selected_thread=selected_summary,
         selected_thread_members=_thread_participant_users(selected_thread) if selected_thread else [],
         messages=messages,
         active_recipients=active_recipients,
         potential_group_members=potential_group_members,
+        offline_recipients=offline_recipients,
         max_message_length=MAX_MESSAGE_LENGTH,
         thread_ids=thread_ids,
         current_thread_id=current_thread_id,
         blocked_user_id=blocked_user_id,
+        body_class="chat-page",
     )
 
 
@@ -1588,9 +1609,8 @@ def send():
         return redirect(url_for("chat.index", thread=thread.id))
 
     message = _persist_message(thread, current_user, body)
-    # AI disabled: model hangs/crashes, needs fixing separately
-    # arch_message = _maybe_send_archdruid_reply(thread, current_user, body)
-    arch_message = None
+    # AI now uses OpenAI API for fast, reliable responses
+    arch_message = _maybe_send_archdruid_reply(thread, current_user, body)
     db.session.commit()
     fresh_message = (
         ChatMessage.query.options(joinedload(ChatMessage.sender), selectinload(ChatMessage.keys))

@@ -163,6 +163,13 @@ class Config:
     AI_GENERATION_TIMEOUT = int(
         os.environ.get("NEO_DRUIDIC_GENERATION_TIMEOUT", "45")
     )
+    # OpenAI API configuration (for fast, reliable AI responses)
+    AI_USE_OPENAI = os.environ.get("NEO_DRUIDIC_USE_OPENAI", "true").lower() in ("true", "1", "yes")
+    # RAG (Retrieval Augmented Generation) configuration
+    RAG_ENABLED = os.environ.get("NEO_DRUIDIC_RAG_ENABLED", "true").lower() in ("true", "1", "yes")
+    RAG_TOP_K = int(os.environ.get("NEO_DRUIDIC_RAG_TOP_K", "3"))
+    RAG_CHUNK_SIZE = int(os.environ.get("NEO_DRUIDIC_RAG_CHUNK_SIZE", "512"))
+    RAG_CHUNK_OVERLAP = int(os.environ.get("NEO_DRUIDIC_RAG_CHUNK_OVERLAP", "128"))
     # Surface Solana / NEOD settings so the treasury bootstrap can read them.
     _solana_wallet = os.environ.get("SOLANA_WALLET_ADDRESS")
     if _solana_wallet:

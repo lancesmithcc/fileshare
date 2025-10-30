@@ -160,6 +160,14 @@ def _build_post_context(post: Post) -> dict:
 
 @social_bp.route("/")
 def index():
+    query_text = (request.query_string or b"").decode()
+    if (
+        request.args.get("threads") is not None
+        or request.args.get("chat") is not None
+        or "threads" in query_text
+        or "chat" in query_text
+    ):
+        return redirect(url_for("chat.index"))
     if current_user.is_authenticated:
         return redirect(url_for("social.feed"))
     return redirect(url_for("auth.login"))
