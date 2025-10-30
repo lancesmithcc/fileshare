@@ -44,168 +44,180 @@
           </div>
         </div>
 
-        <div class="chat-sidebar-actions">
-          <details class="chat-action-card">
-            <summary>
-              <span class="chat-summary-icon" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                  <path d="M5 5.5h9.5A3.5 3.5 0 0 1 18 9v0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
-                  <path d="M5 5.5h14a2.5 2.5 0 0 1 2.5 2.5v6a2.5 2.5 0 0 1-2.5 2.5h-5.5L9 21v-4H5A2.5 2.5 0 0 1 2.5 14V8A2.5 2.5 0 0 1 5 5.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="none" />
-                  <path d="M16 3.5v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
-                  <path d="M14 5.5h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
-                </svg>
-              </span>
-              <span>Start Direct Message</span>
-            </summary>
-            <form action="{{ url_for('chat.start_dm') }}" method="post" class="chat-sidebar-form">
-              <label for="dm-recipient">Choose a member</label>
-              <select id="dm-recipient" name="recipient_id" required>
-                <option value="">Select a member…</option>
-                {% for member in active_recipients %}
-                  <option value="{{ member.id }}">{{ member.username }}{% if not member.has_chat_keys %} (keys pending){% endif %}</option>
-                {% endfor %}
-              </select>
-              <button type="submit" class="chat-action-submit">
-                <span>Open conversation</span>
-              </button>
-            </form>
-          </details>
-          <details class="chat-action-card">
-            <summary>
-              <span class="chat-summary-icon" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                  <circle cx="8" cy="9.5" r="3" stroke="currentColor" stroke-width="1.6" fill="none" />
-                  <circle cx="16" cy="9.5" r="3" stroke="currentColor" stroke-width="1.6" fill="none" />
-                  <path d="M3.5 17c0-1.93 1.57-3.5 3.5-3.5h1c1.93 0 3.5 1.57 3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
-                  <path d="M12.5 17c0-1.93 1.57-3.5 3.5-3.5h1c1.93 0 3.5 1.57 3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
-                  <path d="M12 6v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
-                  <path d="M10 8h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
-                </svg>
-              </span>
-              <span>Create Group Room</span>
-            </summary>
-            <form action="{{ url_for('chat.create_group') }}" method="post" class="chat-sidebar-form">
-              <label for="group-name">Room name</label>
-              <input id="group-name" name="name" type="text" maxlength="120" placeholder="Moonlit Council">
-              <label for="group-members">Invite members</label>
-              <select id="group-members" name="members" multiple size="6">
-                {% for member in potential_group_members %}
-                  <option value="{{ member.id }}">{{ member.username }}{% if not member.has_chat_keys %} (keys pending){% endif %}</option>
-                {% endfor %}
-              </select>
-              <p class="form-hint">Hold Ctrl/⌘ to choose several members at once.</p>
-              <button type="submit" class="chat-action-submit">
-                <span>Create room</span>
-              </button>
-            </form>
-          </details>
-        </div>
-
-        <section class="chat-sidebar-section">
-          <header class="chat-sidebar-section-header">
-            <span>Available Now</span>
-            <span class="chat-sidebar-count">{{ active_recipients|length }}</span>
-          </header>
-          <ul class="chat-contact-list">
-            {% for member in active_recipients %}
-            <li class="chat-contact">
-              <form action="{{ url_for('chat.start_dm') }}" method="post" class="chat-contact-form">
-                <input type="hidden" name="recipient_id" value="{{ member.id }}">
-                <button type="submit" class="chat-contact-button">
-                  <span class="chat-contact-name">{{ member.username }}</span>
-                  <span class="chat-contact-meta">Direct message</span>
-                </button>
-              </form>
-            </li>
+        <div class="chat-sidebar-columns">
+          <section class="chat-column chat-column-users">
+            <header class="chat-column-header">
+              <div class="chat-column-heading">
+                <h3>Online Members</h3>
+                <p class="chat-column-subtitle">Active in the grove</p>
+              </div>
+              <span class="chat-sidebar-count">{{ active_recipients|length }}</span>
+            </header>
+            {% if active_recipients %}
+            <ul class="chat-contact-list chat-contact-list--online" data-chat-online-list>
+              {% for member in active_recipients %}
+              <li class="chat-contact">
+                <form action="{{ url_for('chat.start_dm') }}" method="post" class="chat-contact-form">
+                  <input type="hidden" name="recipient_id" value="{{ member.id }}">
+                  <button type="submit" class="chat-contact-button">
+                    <span class="chat-contact-name">{{ member.username }}</span>
+                    <span class="chat-contact-meta">Direct message</span>
+                  </button>
+                </form>
+              </li>
+              {% endfor %}
+            </ul>
             {% else %}
-            <li class="chat-contact chat-contact-empty">
-              <span>No members are active right now.</span>
-            </li>
-            {% endfor %}
-          </ul>
-          {% if offline_recipients %}
-          <button type="button" class="chat-contact-toggle" data-chat-offline-toggle aria-expanded="false" aria-controls="chat-offline-list">
-            <span data-chat-offline-toggle-label>Show offline members</span>
-          </button>
-          <ul class="chat-contact-list chat-contact-list--offline is-hidden" id="chat-offline-list" data-chat-offline-list>
-            {% for member in offline_recipients %}
-            <li class="chat-contact is-offline">
-              <form action="{{ url_for('chat.start_dm') }}" method="post" class="chat-contact-form">
-                <input type="hidden" name="recipient_id" value="{{ member.id }}">
-                <button type="submit" class="chat-contact-button"{% if not member.has_chat_keys %} disabled{% endif %}>
-                  <span class="chat-contact-name">{{ member.username }}</span>
-                  <span class="chat-contact-meta">{% if member.has_chat_keys %}Offline{% else %}Keys pending{% endif %}</span>
-                </button>
-              </form>
-            </li>
-            {% endfor %}
-          </ul>
-          {% endif %}
-        </section>
+            <p class="chat-empty chat-empty--compact">No members are active right now.</p>
+            {% endif %}
+            {% if offline_recipients %}
+            <button type="button" class="chat-contact-toggle" data-chat-offline-toggle aria-expanded="false" aria-controls="chat-offline-list">
+              <span class="chat-contact-toggle-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                  <path d="M5 8l5 5 5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                </svg>
+              </span>
+              <span data-chat-offline-toggle-label>Show offline members</span>
+            </button>
+            <ul class="chat-contact-list chat-contact-list--offline is-hidden" id="chat-offline-list" data-chat-offline-list>
+              {% for member in offline_recipients %}
+              <li class="chat-contact is-offline">
+                <form action="{{ url_for('chat.start_dm') }}" method="post" class="chat-contact-form">
+                  <input type="hidden" name="recipient_id" value="{{ member.id }}">
+                  <button type="submit" class="chat-contact-button"{% if not member.has_chat_keys %} disabled{% endif %}>
+                    <span class="chat-contact-name">{{ member.username }}</span>
+                    <span class="chat-contact-meta">{% if member.has_chat_keys %}Offline{% else %}Keys pending{% endif %}</span>
+                  </button>
+                </form>
+              </li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+          </section>
+          <section class="chat-column chat-column-conversations">
+            <div class="chat-column-actions">
+              <details class="chat-action-card">
+                <summary>
+                  <span class="chat-summary-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                      <path d="M5 5.5h9.5A3.5 3.5 0 0 1 18 9v0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                      <path d="M5 5.5h14a2.5 2.5 0 0 1 2.5 2.5v6a2.5 2.5 0 0 1-2.5 2.5h-5.5L9 21v-4H5A2.5 2.5 0 0 1 2.5 14V8A2.5 2.5 0 0 1 5 5.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="none" />
+                      <path d="M16 3.5v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                      <path d="M14 5.5h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                    </svg>
+                  </span>
+                  <span>Start Direct Message</span>
+                </summary>
+                <form action="{{ url_for('chat.start_dm') }}" method="post" class="chat-sidebar-form">
+                  <label for="dm-recipient">Choose a member</label>
+                  <select id="dm-recipient" name="recipient_id" required>
+                    <option value="">Select a member…</option>
+                    {% for member in active_recipients %}
+                      <option value="{{ member.id }}">{{ member.username }}{% if not member.has_chat_keys %} (keys pending){% endif %}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="chat-action-submit">
+                    <span>Open conversation</span>
+                  </button>
+                </form>
+              </details>
+              <details class="chat-action-card">
+                <summary>
+                  <span class="chat-summary-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                      <circle cx="8" cy="9.5" r="3" stroke="currentColor" stroke-width="1.6" fill="none" />
+                      <circle cx="16" cy="9.5" r="3" stroke="currentColor" stroke-width="1.6" fill="none" />
+                      <path d="M3.5 17c0-1.93 1.57-3.5 3.5-3.5h1c1.93 0 3.5 1.57 3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                      <path d="M12.5 17c0-1.93 1.57-3.5 3.5-3.5h1c1.93 0 3.5 1.57 3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                      <path d="M12 6v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                      <path d="M10 8h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" />
+                    </svg>
+                  </span>
+                  <span>Create Group Room</span>
+                </summary>
+                <form action="{{ url_for('chat.create_group') }}" method="post" class="chat-sidebar-form">
+                  <label for="group-name">Room name</label>
+                  <input id="group-name" name="name" type="text" maxlength="120" placeholder="Moonlit Council">
+                  <label for="group-members">Invite members</label>
+                  <select id="group-members" name="members" multiple size="6">
+                    {% for member in potential_group_members %}
+                      <option value="{{ member.id }}">{{ member.username }}{% if not member.has_chat_keys %} (keys pending){% endif %}</option>
+                    {% endfor %}
+                  </select>
+                  <p class="form-hint">Hold Ctrl/⌘ to choose several members at once.</p>
+                  <button type="submit" class="chat-action-submit">
+                    <span>Create room</span>
+                  </button>
+                </form>
+              </details>
+            </div>
+            <div class="chat-column-lists">
+              <section class="chat-sidebar-section">
+                <header class="chat-sidebar-section-header">
+                  <span>Direct Messages</span>
+                  <span class="chat-sidebar-count">{{ direct_threads|length }}</span>
+                </header>
+                {% if direct_threads %}
+                <ul class="chat-thread-list chat-thread-rail">
+                  {% for entry in direct_threads %}
+                  <li class="chat-thread-card {% if selected_thread and entry.thread.id == selected_thread.thread.id %}active{% endif %}"
+                      data-thread-id="{{ entry.thread.id }}"
+                      data-is-group="{{ 1 if entry.is_group else 0 }}"
+                      data-owner-id="{{ entry.owner_id }}">
+                    <a href="{{ url_for('chat.index', thread=entry.thread.id) }}" class="chat-thread-link">
+                      <div class="chat-thread-row">
+                        <span class="chat-thread-name">{{ entry.display_name }}</span>
+                        {% if entry.last_at %}
+                        <time datetime="{{ entry.last_at.isoformat() }}">{{ entry.last_at.strftime('%b %d %H:%M') }}</time>
+                        {% endif %}
+                      </div>
+                      <p class="chat-thread-preview" data-thread-preview>{{ entry.preview or 'Say hello to restart the conversation.' }}</p>
+                      <span class="chat-thread-unread{% if not entry.unread_count %} is-hidden{% endif %}" data-thread-unread>
+                        {% if entry.unread_count %}{{ entry.unread_count }}{% endif %}
+                      </span>
+                    </a>
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% else %}
+                <p class="chat-empty">No direct messages yet. Begin a new conversation above.</p>
+                {% endif %}
+              </section>
 
-        <section class="chat-sidebar-section">
-          <header class="chat-sidebar-section-header">
-            <span>Direct Messages</span>
-            <span class="chat-sidebar-count">{{ direct_threads|length }}</span>
-          </header>
-          {% if direct_threads %}
-          <ul class="chat-thread-list chat-thread-rail">
-            {% for entry in direct_threads %}
-            <li class="chat-thread-card {% if selected_thread and entry.thread.id == selected_thread.thread.id %}active{% endif %}"
-                data-thread-id="{{ entry.thread.id }}"
-                data-is-group="{{ 1 if entry.is_group else 0 }}"
-                data-owner-id="{{ entry.owner_id }}">
-              <a href="{{ url_for('chat.index', thread=entry.thread.id) }}" class="chat-thread-link">
-                <div class="chat-thread-row">
-                  <span class="chat-thread-name">{{ entry.display_name }}</span>
-                  {% if entry.last_at %}
-                  <time datetime="{{ entry.last_at.isoformat() }}">{{ entry.last_at.strftime('%b %d %H:%M') }}</time>
-                  {% endif %}
-                </div>
-                <p class="chat-thread-preview" data-thread-preview>{{ entry.preview or 'Say hello to restart the conversation.' }}</p>
-                <span class="chat-thread-unread{% if not entry.unread_count %} is-hidden{% endif %}" data-thread-unread>
-                  {% if entry.unread_count %}{{ entry.unread_count }}{% endif %}
-                </span>
-              </a>
-            </li>
-            {% endfor %}
-          </ul>
-          {% else %}
-          <p class="chat-empty">No direct messages yet. Begin a new conversation above.</p>
-          {% endif %}
-        </section>
-
-        <section class="chat-sidebar-section">
-          <header class="chat-sidebar-section-header">
-            <span>Group Channels</span>
-            <span class="chat-sidebar-count">{{ group_threads|length }}</span>
-          </header>
-          {% if group_threads %}
-          <ul class="chat-thread-list chat-thread-rail">
-            {% for entry in group_threads %}
-            <li class="chat-thread-card {% if selected_thread and entry.thread.id == selected_thread.thread.id %}active{% endif %}"
-                data-thread-id="{{ entry.thread.id }}"
-                data-is-group="1"
-                data-owner-id="{{ entry.owner_id }}">
-              <a href="{{ url_for('chat.index', thread=entry.thread.id) }}" class="chat-thread-link">
-                <div class="chat-thread-row">
-                  <span class="chat-thread-name">{{ entry.display_name }}</span>
-                  {% if entry.last_at %}
-                  <time datetime="{{ entry.last_at.isoformat() }}">{{ entry.last_at.strftime('%b %d %H:%M') }}</time>
-                  {% endif %}
-                </div>
-                <p class="chat-thread-preview" data-thread-preview>{{ entry.preview or 'Share something with the group.' }}</p>
-                <span class="chat-thread-unread{% if not entry.unread_count %} is-hidden{% endif %}" data-thread-unread>
-                  {% if entry.unread_count %}{{ entry.unread_count }}{% endif %}
-                </span>
-              </a>
-            </li>
-            {% endfor %}
-          </ul>
-          {% else %}
-          <p class="chat-empty">You haven’t joined any groups yet. Create one above.</p>
-          {% endif %}
-        </section>
+              <section class="chat-sidebar-section">
+                <header class="chat-sidebar-section-header">
+                  <span>Group Channels</span>
+                  <span class="chat-sidebar-count">{{ group_threads|length }}</span>
+                </header>
+                {% if group_threads %}
+                <ul class="chat-thread-list chat-thread-rail">
+                  {% for entry in group_threads %}
+                  <li class="chat-thread-card {% if selected_thread and entry.thread.id == selected_thread.thread.id %}active{% endif %}"
+                      data-thread-id="{{ entry.thread.id }}"
+                      data-is-group="1"
+                      data-owner-id="{{ entry.owner_id }}">
+                    <a href="{{ url_for('chat.index', thread=entry.thread.id) }}" class="chat-thread-link">
+                      <div class="chat-thread-row">
+                        <span class="chat-thread-name">{{ entry.display_name }}</span>
+                        {% if entry.last_at %}
+                        <time datetime="{{ entry.last_at.isoformat() }}">{{ entry.last_at.strftime('%b %d %H:%M') }}</time>
+                        {% endif %}
+                      </div>
+                      <p class="chat-thread-preview" data-thread-preview>{{ entry.preview or 'Share something with the group.' }}</p>
+                      <span class="chat-thread-unread{% if not entry.unread_count %} is-hidden{% endif %}" data-thread-unread>
+                        {% if entry.unread_count %}{{ entry.unread_count }}{% endif %}
+                      </span>
+                    </a>
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% else %}
+                <p class="chat-empty">You haven’t joined any groups yet. Create one above.</p>
+                {% endif %}
+              </section>
+            </div>
+          </section>
+        </div>
       </aside>
       <div class="chat-sidebar-overlay" data-chat-sidebar-overlay></div>
 
